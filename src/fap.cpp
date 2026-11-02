@@ -229,11 +229,12 @@ static std::string zulu_hhmm() {
     return b;
 }
 
-static void add_call(const std::string& src, const std::string& text, int prio, Chime chime) {
+// chime = false when the call comes from the cockpit: ToLiss already plays its own chime then.
+static void add_call(const std::string& src, const std::string& text, int prio, Chime chime, bool chime_on = true) {
     CallEvt e{++S.call_seq, src, text, zulu_hhmm(), prio, true};
     S.calls.insert(S.calls.begin(), e);
     if (S.calls.size() > 20) S.calls.resize(20);
-    if (S.powered) fap_audio::play_chime(chime);
+    if (chime_on && S.powered) fap_audio::play_chime(chime);
 }
 
 // ---------------------------------------------------------------------------
@@ -748,9 +749,8 @@ static std::string do_action(const char* json) {
         S.cabin_ready = d("on", !S.cabin_ready) != 0;
         if (S.cabin_ready && !was) {
             // Same as pressing a purser/attendant call pb in the cockpit: ToLiss then
-            // shows CABIN READY in the ECAM memo.
+            // shows CABIN READY in the ECAM memo (and plays its own chime).
             run_command("AirbusFBW/CheckCabin");
-            if (S.powered) fap_audio::play_chime(Chime::Single);
         }
     } else if (a == "evac_cmd") {
         if (dEvacSel.i() != 1) return fail("EVAC CMD ONLY WITH CAPT & PURS SELECTED");
@@ -934,7 +934,7 @@ static float sim_tick(float, float, int, void*) {
 
     // emergency call from cockpit (overhead EMER CALL pb)
     int ec = dEmerCallOHP.i();
-    if (ec && !S.prev_emer_call) add_call("CAPT", "EMER CALL", 2, Chime::HiLoX3);
+    if (ec && !S.prev_emer_call) add_call("CAPT", "EMER CALL", 2, Chime::HiLoX3, false);
     S.prev_emer_call = ec;
 
     // music playlist auto-advance
@@ -975,7 +975,7 @@ static Hook g_hooks[] = {
 static int hook_handler(XPLMCommandRef, XPLMCommandPhase phase, void* ref) {
     if (phase == xplm_CommandBegin) {
         Hook* h = (Hook*)ref;
-        add_call(h->src, h->text, 1, Chime::HiLo);
+        add_call(h->src, h->text, 1, Chime::HiLo, false);
     }
     return 1;  // let ToLiss handle it too
 }
