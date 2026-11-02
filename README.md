@@ -1,0 +1,109 @@
+# ToLiss FAP: Flight Attendant Panel for the ToLiss A320
+
+A working Airbus CIDS **Flight Attendant Panel** for the ToLiss A320 in X-Plane 12.
+It sits on the forward-entry wall behind the cockpit. You can click it in 3D or open it as a popup or a separate window.
+
+![The FAP in the cockpit](docs/img/sim_cockpit.jpg)
+
+> [!NOTE]
+> This is a free community add-on. It is **not affiliated with ToLiss or Airbus**.
+> No ToLiss files are shipped. The installer patches the copy on your own machine and always makes backups first.
+
+**Video:** coming soon.
+
+## Features
+
+- **CIDS-style touch screen**, built with X-Plane 12's browser avionics (HTML/JS rendered by X-Plane's built-in browser and driven by a C++ plugin):
+  - Cabin Status overview
+  - Cabin Lighting
+  - Doors / Slides
+  - Temperature
+  - Water / Waste
+  - Smoke Detection
+  - Audio
+  - Calls
+  - Evacuation
+  - System Info
+  - FAP Config
+  - Caution list
+- **Hooked into the ToLiss systems:**
+  - Door modes (Close / Auto / Open), including cargo doors
+  - Cabin light level
+  - Forward and aft cabin temperature (the cockpit knobs move with it)
+  - The **Cabin Ready** button raises *CABIN READY* on the ECAM.
+- **Audio:**
+  - Boarding music with channels and volume
+  - Real A320 chimes: hi, lo, hi-lo and tri-tone
+  - Prerecorded announcements in a folder tree, with a MEMO queue, Play Next and Play All
+  - Cabin PA is quieter in the cockpit and depends on whether the cockpit door is open.
+- **3D panel hardware**:
+  - Lit keys: EMER, LIGHTS MAIN ON/OFF, LAV MAINT, SCREEN LOCK, EVAC CMD/RESET, SMOKE RESET
+  - Night lighting matched to the ToLiss cabin
+  - Screen brightness follows the ambient light.
+- **Per-livery content:** a livery can bring its own boarding music, announcements and screen-off image.
+- **Plugins menu:**
+  - Show/hide the popup
+  - Pop out into its own window (second monitor)
+  - Rescan sounds
+  - Reload the page
+
+| | |
+|---|---|
+| ![Cabin status](docs/img/page_sts.png) | ![Audio](docs/img/page_audio.png) |
+| ![Doors](docs/img/page_doors.png) | ![Lighting](docs/img/page_light.png) |
+| ![3D hardware](docs/img/hw_34.jpg) | ![Night lighting in the sim](docs/img/sim_lighting.jpg) |
+
+## Install
+
+**Just want to fly?** Read the [User Guide](docs/USER_GUIDE.md). In short:
+
+1. Download the latest zip from [Releases](../../releases).
+2. Close X-Plane.
+3. Unzip the download.
+4. Double-click **`Install FAP.bat`**.
+
+**Requirements:**
+- Windows 10/11
+- X-Plane **12.4+** (needed for the browser avionics API)
+- ToLiss A320 (Neo)
+- A321: not supported yet.
+
+**After every ToLiss update,** run the installer again. ToLiss updates replace the cockpit object and the `.acf`.
+
+**To uninstall,** run `Uninstall FAP.bat`. It restores the original cockpit object and `.acf` attachments.
+
+## How it works
+
+| Piece | What it does |
+|---|---|
+| `src/fap.cpp` | X-Plane plugin. Creates a browser avionics device (`XPLMCreateAvionicsEx`, `xplm_WindowContentTypeBrowser`) that loads `html/index.html`. It exposes `xplane.getState` / `xplane.action` to the page, reads and writes the ToLiss datarefs, and runs the commands, chimes and sound playback. |
+| `src/audio.cpp` | Small WAV mixer on top of X-Plane's FMOD sound API (`XPLMSound`). |
+| `html/index.html` | The whole FAP UI: one self-contained page with no external dependencies. Open it in a desktop browser to preview it with demo data. |
+| `obj/fap_screen.obj` | Screen surface (`ATTR_cockpit_device`) and click zones. In X-Plane only the cockpit object receives clicks, so the installer appends this to your local ToLiss cockpit OBJ. The original is kept as `*.fap-original`. |
+| `obj/fap_hw.*` | Our own 3D model of the panel hardware with albedo, LIT and normal textures, attached as an extra object in the `.acf`. |
+| `installer/Install-FAP.ps1` | Install, update and uninstall. Plain Windows PowerShell 5.1 with nothing else to install. Every file it touches gets a timestamped `.fapbak-*` backup. |
+
+Commands, datarefs, the build and the asset pipeline are covered in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+
+## Adding sounds
+
+Supported audio is 16-bit PCM `.wav`.
+
+- **Your own sounds:** drop the files into `plugins/ToLissFAP/sounds/music` or `sounds/announcements`.
+- **Per-livery content:** see [LIVERY_FAP.txt](LIVERY_FAP.txt).
+- **Livery painters:** you are welcome to ship a `FAP/` folder with your livery.
+
+## Contributing
+
+Issues and pull requests are welcome. These would help most:
+- A321 support
+- macOS and Linux builds
+- More pages and system hooks
+- Translations
+
+## License
+
+- **Code, UI and 3D model:** [GPL-3.0-or-later](LICENSE).
+- **Shipped audio:** public domain / CC0. Details in [sounds/CREDITS.txt](sounds/CREDITS.txt).
+- **X-Plane SDK headers and libraries** in `sdk/`: their own permissive license ([sdk/license.txt](sdk/license.txt)).
+- **Trademarks:** ToLiss, Airbus and X-Plane belong to their owners and are used here only to describe compatibility.

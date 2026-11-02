@@ -1,0 +1,25 @@
+ToLiss FAP - per-livery content
+===============================
+
+Any livery can carry its own FAP content in a folder called "FAP" inside the livery:
+
+  <aircraft>/liveries/<Livery name>/FAP/
+      screen_off.png            image shown when the FAP screen is switched off
+                                (.jpg also works; 1100 x 840 px is ideal).
+                                Leave it out to get the default screen;
+                                use a plain black image for "nothing".
+      sounds/music/*.wav        boarding music for this livery
+      sounds/announcements/...  announcements for this livery, same layout as the main set:
+                                <NN Announcement>/<Language>.wav  (folders optional)
+
+Livery sounds are added on top of the general sounds in plugins/ToLissFAP/sounds:
+  - Boarding music: the list shows a LIVERY section first, then GENERAL.
+  - Announcements: the livery's own announcements are listed first; the general
+    ones are grouped in a "General" folder.
+
+Audio: 16-bit PCM .wav (mono or stereo, any sample rate). The FAP picks up the
+livery when the aircraft loads or the livery is changed; press Rescan on the
+FAP Config page after adding files while the sim is running.
+
+Livery painters: you are welcome to ship a FAP folder with your livery.
+Only include sounds you have the right to distribute.

@@ -1,0 +1,15 @@
+ToLiss FAP - sound credits
+==========================
+All sounds shipped with ToLiss FAP are public domain / CC0.
+
+Boarding music (sounds/music, from Wikimedia Commons, converted to 32 kHz mono WAV):
+  01 Gymnopedie No1 (Satie)   - "File:Gymnopedie No. 1..ogg" - recording released under CC0
+  02 Clair de Lune (Debussy)  - "File:Clair de lune (Claude Debussy) Suite bergamasque.ogg" - public domain
+  03 Sonata K545 (Mozart)     - "File:Wolfgang Amadeus Mozart - sonata no. 16 in c major, k.545 'sonata facile' - i. allegro.ogg" - public domain
+  Source: https://commons.wikimedia.org
+
+Cabin chimes (sounds/chimes), cut from CC0 Freesound recordings of a real A320:
+  hi-lo / emergency : "Airplane, Seatbelt Sign Beep" by Kinoton - https://freesound.org/s/670297/ (CC0)
+  tri-tone, hi, lo  : "A320 tritone chime.wav" by nachosose     - https://freesound.org/s/244583/ (CC0)
+
+No announcements are shipped. Add your own in sounds/announcements (see the README there).

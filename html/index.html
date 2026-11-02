@@ -1,0 +1,872 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later - Copyright (C) 2026 pierr3 and ToLiss FAP contributors -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FAP</title>
+<style>
+:root{
+  --stone:#6f6f6f; --key:#dcdcdc; --keyTxt:#1b1b1b; --on:#1fcf1f; --amber:#f2b100; --red:#e32626;
+  --panel:#8a8a8a; --lblue:#cfe8fb; --cyan:#4fd6ff; --navy:#2e3191; --msg:#25287a; --white:#fff;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-user-select:none;user-select:none}
+html,body{width:1100px;height:840px;overflow:hidden;color:var(--white);
+  font-family:"Segoe UI","Frutiger","Myriad Pro",Arial,sans-serif;font-size:16px;
+  background:#626262 url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='256' height='256'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' seed='7' stitchTiles='stitch'/><feColorMatrix type='matrix' values='0.33 0.33 0.33 0 0  0.33 0.33 0.33 0 0  0.33 0.33 0.33 0 0  0 0 0 0 1'/><feComponentTransfer><feFuncR type='linear' slope='2.2' intercept='-0.62'/><feFuncG type='linear' slope='2.2' intercept='-0.62'/><feFuncB type='linear' slope='2.2' intercept='-0.62'/></feComponentTransfer></filter><filter id='s'><feTurbulence type='turbulence' baseFrequency='0.06' numOctaves='2' seed='3' stitchTiles='stitch'/><feColorMatrix type='matrix' values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 -2.2 1.05'/></filter><rect width='256' height='256' filter='url(%23n)' opacity='0.55'/><rect width='256' height='256' filter='url(%23s)' opacity='0.10'/></svg>");}
+#title{position:absolute;top:20px;left:0;right:0;text-align:center;font-family:Arial,"Helvetica Neue",sans-serif;font-size:31px;font-weight:400;letter-spacing:.5px;text-shadow:1px 1px 1px #0008}
+#main{position:absolute;top:84px;left:0;right:0;bottom:122px}
+/* keys */
+.key{display:inline-flex;align-items:center;justify-content:center;text-align:center;vertical-align:middle;
+  min-width:62px;height:54px;padding:2px 6px;font-family:Arial,"Helvetica Neue",sans-serif;font-size:14px;line-height:1.15;color:var(--keyTxt);
+  background:linear-gradient(170deg,#f2f2f2 0%,#dcdcdc 45%,#c4c4c4 100%);border:1px solid #2f2f2f;border-radius:5px;
+  box-shadow:inset 1px 1px 0 #ffffff, inset -1px -1px 0 #8d8d8d, inset 0 0 0 2px #e4e4e4, 1px 2px 2px #0007;cursor:pointer;white-space:normal}
+.key:active{box-shadow:inset -1px -1px 0 #ffffff, inset 1px 1px 0 #8d8d8d, 0 0 1px #0007;filter:brightness(.94)}
+.key.on{background:linear-gradient(170deg,#7cf07c 0%,#34cc34 45%,#1a9a1a 100%);color:#062006;border-color:#0d3d0d;
+  box-shadow:inset 1px 1px 0 #b8ffb8, inset -1px -1px 0 #0f6a0f, inset 0 0 0 2px #46d446, 1px 2px 2px #0007}
+.key.amb{background:linear-gradient(170deg,#ffe07a 0%,#f2b400 50%,#c58f00 100%);color:#2a1c00;border-color:#5a4000}
+.key.red{background:linear-gradient(170deg,#ff8a8a 0%,#e02a2a 50%,#a51414 100%);color:#fff;border-color:#4a0000}
+.key.dis,.key.ghost{color:#a6a6a6}
+.key.dis{pointer-events:none}
+.key.sq{width:54px;min-width:54px}
+.key.wide{min-width:120px}
+.corner{position:absolute;z-index:20}
+/* panels */
+.grp{position:absolute;background:linear-gradient(#939393,#858585);border:2px solid;border-color:#b9b9b9 #4e4e4e #4e4e4e #b9b9b9;
+  box-shadow:1px 2px 4px #0006;padding:6px 8px 8px}
+.grp > .hd{text-align:center;font-size:15px;letter-spacing:.5px;margin-bottom:5px;text-transform:uppercase}
+.row{display:flex;gap:4px;align-items:center;justify-content:center}
+.col{display:flex;flex-direction:column;gap:4px;align-items:center}
+.lbl{position:absolute;font-family:Arial,"Helvetica Neue",sans-serif;font-size:15px;text-align:center;text-transform:uppercase;letter-spacing:.3px;text-shadow:1px 1px 1px #0007}
+.val{background:var(--lblue);color:#111;border:2px solid;border-color:#666 #eee #eee #666;padding:3px 8px;font-size:17px;text-align:center;min-width:70px}
+.msg{position:absolute;background:var(--msg);border:3px solid;border-color:#5a5a5a #c9c9c9 #c9c9c9 #5a5a5a;color:var(--amber);
+  font-size:17px;padding:10px 12px;line-height:1.35;overflow:hidden}
+.msg .w{color:#fff}.msg .r{color:#ff6b6b}.msg .g{color:#5cff5c}
+.msgHd{position:absolute;background:linear-gradient(#9a9a9a,#828282);border:2px solid;border-color:#c0c0c0 #555 #555 #c0c0c0;
+  font-size:15px;padding:3px 10px;text-transform:uppercase}
+.amb{color:var(--amber)} .grn{color:#3dff3d} .redt{color:#ff5050}
+/* nav */
+#navWrap{position:absolute;left:50%;transform:translateX(-50%);bottom:14px;width:780px}
+#navBar{position:relative;height:18px;margin:0 60px 6px;border-radius:9px;background:linear-gradient(#f4f8fa,#c9d4da);
+  border:1px solid #3a3a3a;box-shadow:inset 1px 1px 2px #0005, 0 1px 0 #ffffff40}
+#navBar i{position:absolute;top:2px;bottom:2px;border-radius:7px;background:linear-gradient(#9cf29c,#3cc43c 55%,#1d8f1d);box-shadow:0 0 0 1px #0d4d0d}
+#nav{display:flex;gap:6px;align-items:center;padding:7px 9px;border-radius:5px;background:linear-gradient(#a2a2a2,#868686);
+  border:1px solid #2a2a2a;box-shadow:inset 1px 1px 0 #cfcfcf, inset -1px -1px 0 #555, 1px 2px 3px #0008}
+#nav .key{width:66px;min-width:66px;height:56px;font-size:13px;padding:2px 3px}
+#nav .arrow{width:50px;min-width:50px;font-size:0;color:#111}
+#nav .arrow svg{display:block}
+#nav .arrow.ghost{color:#a0a0a0}
+/* overlays */
+.ovl{position:fixed;inset:0;z-index:90;display:none}
+#off{background:#000;z-index:99}
+#scrOff{background:#000 center/cover no-repeat;z-index:95}
+#boot{background:inherit;z-index:96}
+#boot .bt{position:absolute;top:56px;left:0;right:0;text-align:center;font-size:28px;letter-spacing:1px}
+#boot .bx{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:360px;height:62px;padding:12px;
+  background:linear-gradient(#cfcfcf,#9d9d9d);border:2px solid;border-color:#eee #555 #555 #eee;box-shadow:2px 3px 6px #0007}
+#boot .tr{height:100%;background:var(--lblue);border:2px solid;border-color:#555 #fff #fff #555}
+#boot .fl{height:100%;width:0;background:var(--navy)}
+#modal{background:#0007;z-index:97;align-items:center;justify-content:center}
+#modal .grp{position:relative;width:560px;padding:18px;text-align:center}
+#modal p{font-size:22px;margin:14px 0 20px}
+#banner{position:absolute;top:68px;left:200px;right:200px;z-index:30;display:none;text-align:center;padding:6px 10px;
+  background:var(--amber);color:#1a1200;font-size:19px;font-weight:600;border:2px solid #fff6;cursor:pointer}
+#banner.emer{background:var(--red);color:#fff;animation:pulse .8s infinite alternate}
+@keyframes pulse{to{filter:brightness(1.3)}}
+#toast{position:absolute;left:50%;bottom:140px;transform:translateX(-50%);z-index:40;display:none;background:var(--msg);color:var(--amber);
+  border:2px solid #ccc;padding:8px 16px;font-size:17px}
+.lb{position:absolute;background:#fff;border:2px solid;border-color:#4a4a4a #e6e6e6 #e6e6e6 #4a4a4a;color:#111;font-family:Arial,sans-serif;font-size:14px;overflow:hidden}
+.lb .hdr{height:16px;background:linear-gradient(#bfe3fb,#5ea9df);border-bottom:1px solid #3d7fb0}
+.lb .it{height:24px;line-height:24px;padding:0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-bottom:1px solid #eef2f5;cursor:pointer}
+.lb .it.sel{background:#4d9ee0;color:#fff}
+.lb .it.play{color:#0a8a0a;font-weight:700}.lb .it.sel.play{color:#d9ffd9}
+.sub{position:absolute;border:2px solid;border-color:#5a5a5a #c8c8c8 #c8c8c8 #5a5a5a;background:#ffffff0c}
+.track{position:absolute;width:8px;border-radius:4px;background:#5d5d5d;border:1px solid;border-color:#3a3a3a #a8a8a8 #a8a8a8 #3a3a3a}
+svg text{font-family:"Segoe UI",Arial,sans-serif}
+</style>
+</head>
+<body>
+<div id="title">CABIN STATUS</div>
+<button class="key sq corner ghost" id="kCaut" style="left:20px;top:18px">CAUT</button>
+<div class="corner" style="right:20px;top:18px;display:flex;gap:2px"><button class="key sq" id="kCfg">FAP<br>Config</button></div>
+<button class="key sq corner" id="kScr" style="left:20px;bottom:24px">Screen<br>Off</button>
+<button class="key sq corner" id="kReady" style="left:80px;bottom:24px">Cabin<br>Ready</button>
+<button class="key sq corner" id="kSts" style="right:20px;bottom:24px">Cabin<br>Status</button>
+<div id="banner"></div>
+<div id="main"></div>
+<div id="navWrap"><div id="navBar"><i id="navFill"></i></div><div id="nav"></div></div>
+<div id="toast"></div>
+<div class="ovl" id="boot"><div class="bt">CIDS POWER-UP</div><div class="bx"><div class="tr"><div class="fl" id="bootFill"></div></div></div></div>
+<div class="ovl" id="scrOff"></div>
+<div class="ovl" id="lockOv" style="z-index:94;background:#0009;align-items:center;justify-content:center"><div class="msg" style="position:relative;font-size:26px;padding:24px 40px;color:#fff">SCREEN LOCKED &nbsp;<span id="lockS"></span> s</div></div>
+<div class="ovl" id="off"></div>
+<div id="dimmer" style="position:fixed;inset:0;background:#000;pointer-events:none;z-index:98;opacity:0"></div>
+<div class="ovl" id="modal"><div class="grp"><div class="hd" id="mTitle">CONFIRM</div><p id="mTxt"></p>
+  <div class="row" style="gap:20px"><button class="key wide" id="mNo">Cancel</button><button class="key wide red" id="mYes">Confirm</button></div></div></div>
+
+<script>
+"use strict";
+// ================================================================ bridge
+// X-Plane attaches window.xplane to the page; it may appear after our script first runs, so detect lazily.
+let HAS_XP = false, xpAnnounced = false;
+function detectXP(){
+  HAS_XP = !!(window.xplane && typeof window.xplane.getState === "function");
+  if(HAS_XP && !xpAnnounced){ xpAnnounced = true; mock = null; try{ xplane.log && xplane.log({hello:"bridge detected", keys:Object.keys(window.xplane)}); }catch(e){} }
+  return HAS_XP;
+}
+let S = null, mock = null;
+function mockState(){
+  if(!mock) mock = {v:"dev",pwr:1,utc:"12:34",phase:1,gnd:1,toliss:1,icao:"A320",
+    doors:[{pos:1,mode:2,armed:0,slide:0},{pos:0,mode:1,armed:0,slide:0},{pos:0,mode:1,armed:0,slide:0},{pos:0,mode:1,armed:0,slide:0}],
+    cargo:[{pos:1,mode:2},{pos:0.5,mode:2},{pos:0,mode:1}],emer:[0,0,0,0],ckptLock:0,ckptDoor:0,
+    light:{perc:100,act:.95},fsb:1,ns:1,temp:{ck:23.1,z1:24.6,z2:25.2,sCk:22,sF:22,sA:23},
+    water:86,waste:54,wpre:100,wfill:0,wdrain:0,lav:[{n:"A",occ:1,smoke:0},{n:"D",occ:0,smoke:0},{n:"E",occ:0,smoke:0}],smokeTest:0,
+    calls:[{id:2,src:"PAX 14C",txt:"PAX CALL",tm:"12:31",prio:0,act:1},{id:1,src:"CAPT",txt:"CALL FWD ATTND",tm:"12:20",prio:1,act:0}],
+    ckptCall:0,cabinReady:0,evac:{light:0,btn:0,sel:0},pax:174,oxy:0,cabAlt:0,bright:.9,debugQuad:1,
+    music:{files:["01 Gymnopedie No1 (Satie)","02 Clair de Lune (Debussy)","03 Sonata K545 (Mozart)"],liv:0,idx:0,playing:0,vol:.5},ann:{files:["01 Welcome/English","01 Welcome/French","01 Welcome/Spanish","02 Boarding Completed","03 Cabin Crew Arm Doors","04 Safety Instructions","05 Electronic Devices","06 Fasten Seat Belt","07 Seat Belt Off","08 Turbulence","09 Top of Descent","10 Cabin Crew Seats for Landing","11 After Landing","12 Cabin Crew Disarm Doors","13 Delay","14 De-icing"],idx:-1,playing:0,vol:.9,memo:[3,5,6],queue:0},audioMsg:"",ui:{}};
+  return mock;
+}
+async function getState(){
+  if(detectXP()){ try{ return await xplane.getState(null); }catch(e){ return S; } }
+  return JSON.parse(JSON.stringify(mockState()));
+}
+async function act(a, args){
+  const msg = Object.assign({a}, args||{});
+  let r;
+  if(detectXP()){ try{ r = await xplane.action(msg); }catch(e){ r = {ok:false,err:String(e)}; } }
+  else { r = {ok:true}; mockAct(msg); }
+  if(r && r.ok===false) toast(r.err||"NOT AVAILABLE");
+  poll();
+  return r;
+}
+function mockAct(m){
+  const s=mockState();
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  switch(m.a){
+    case "door_mode": s.doors[m.i].mode=m.mode; if(m.mode!==1) s.doors[m.i].pos=m.mode===2?1:0; break;
+    case "cargo_mode": s.cargo[m.i].mode=m.mode; if(m.mode!==1) s.cargo[m.i].pos=m.mode===2?1:0; break;
+    case "all_doors": s.doors.forEach(d=>{d.mode=m.mode; if(m.mode!==1) d.pos=m.mode===2?1:0;}); break;
+    case "arm_slides": s.doors.forEach(d=>d.armed=d.pos<0.01?1:0); break;
+    case "disarm_slides": s.doors.forEach(d=>d.armed=0); break;
+    case "light": s.light.perc=m.level; s.light.act=m.level/100; break;
+    case "temp": { const k=m.zone==="aft"?"sA":"sF"; s.temp[k]=clamp(s.temp[k]+m.delta,18,30); break; }
+    case "temp_reset": s.temp.sF=s.temp.sA=s.temp.sCk; break;
+    case "water_presel": s.wpre=m.pct; break;
+    case "water_fill": s.wfill=s.wfill?0:1; break;
+    case "waste_drain": s.wdrain=s.wdrain?0:1; break;
+    case "cabin_ready": s.cabinReady=m.on?1:0; break;
+    case "call_reset": s.calls.forEach(c=>{ if(m.id<0||c.id===m.id) c.act=0; }); break;
+    case "call_clear": s.calls=s.calls.filter(c=>c.act); break;
+    case "music_play": s.music.idx=m.i!==undefined?m.i:Math.max(0,s.music.idx); s.music.playing=1; break;
+    case "music_next": s.music.idx=(s.music.idx+1)%s.music.files.length; s.music.playing=1; break;
+    case "music_stop": s.music.playing=0; break;
+    case "music_sel": s.music.idx=m.i; break;
+    case "music_vol": s.music.vol=m.v; break;
+    case "ann_play": s.ann.idx=m.i; s.ann.playing=1; setTimeout(()=>s.ann.playing=0,3000); break;
+    case "ann_stop": s.ann.playing=0; break;
+    case "memo_add": s.ann.memo.push(m.i); break;
+    case "memo_del": s.ann.memo.splice(m.p,1); break;
+    case "memo_clear": s.ann.memo=[]; break;
+    case "memo_next": if(s.ann.memo.length){ s.ann.idx=s.ann.memo.shift(); s.ann.playing=1; setTimeout(()=>s.ann.playing=0,3000);} break;
+    case "memo_all": if(s.ann.memo.length){ s.ann.idx=s.ann.memo[0]; s.ann.playing=1; s.ann.queue=s.ann.memo.length-1; setTimeout(()=>{s.ann.playing=0;s.ann.queue=0;},3000);} break;
+    case "bright": s.bright=m.v; break;
+    case "debug_quad": s.debugQuad=m.on?1:0; break;
+    case "smoke_test": s.lav.forEach(l=>l.smoke=1); s.smokeTest=1; setTimeout(()=>{s.lav.forEach(l=>l.smoke=0); s.smokeTest=0;},6000); break;
+    case "smoke_reset": s.lav.forEach(l=>l.smoke=0); break;
+    case "ui_set": s.ui[m.k]=m.v; break;
+  }
+}
+const ui = (k, def) => (S && S.ui && S.ui[k]!==undefined) ? S.ui[k] : def;
+const setUi = (k, v) => act("ui_set", {k, v});
+
+// ================================================================ helpers
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let toastT=0;
+function toast(t){ const e=$("toast"); e.textContent=t; e.style.display="block"; clearTimeout(toastT); toastT=setTimeout(()=>e.style.display="none",2600); }
+let modalCb=null;
+function confirmBox(title, txt, cb, yes){
+  $("mTitle").textContent=title; $("mTxt").textContent=txt; $("mYes").textContent=yes||"Confirm";
+  modalCb=cb; $("modal").style.display="flex";
+}
+$("mNo").onclick=()=>{ $("modal").style.display="none"; modalCb=null; };
+$("mYes").onclick=()=>{ $("modal").style.display="none"; const cb=modalCb; modalCb=null; if(cb) cb(); };
+const key = (label, onclick, cls, attrs) => `<button class="key ${cls||""}" ${attrs||""} onclick="${onclick}">${label}</button>`;
+const C2F = c => c*9/5+32;
+function tFmt(c, dec){ return ui("tu",0) ? C2F(c).toFixed(dec??1)+"°F" : c.toFixed(dec??1)+"°C"; }
+
+// door naming / layout (A320: 1L 1R 2L 2R + 4 overwing exits; A321: 1L 1R 4L 4R)
+function doorNames(s){
+  const aft = (s.icao||"").startsWith("A321") ? "4" : "2";
+  const base = ["1L","1R",aft+"L",aft+"R"];
+  return s.doors.map((d,i)=> base[i] || ((i%2?"R":"L")+(Math.floor(i/2)+1)));
+}
+function doorState(pos){ return pos<0.01 ? "closed" : pos>0.98 ? "open" : "moving"; }
+
+// ================================================================ fuselage drawing
+// Vertical aircraft, nose up. Returns SVG content; fy(f) maps a 0..1 fraction of length to y.
+let FUS_ID = 0;
+function fuselage(w, h, opts){
+  opts = opts||{};
+  const id = "fu"+(FUS_ID++);
+  const nose = h*0.15, tail0 = h*0.80;
+  // ogive nose, parallel body, gently tapering rounded tail
+  const p = `M${w/2},0 C${w*0.40},${h*0.018} ${w*0.05},${nose*0.5} 0,${nose} L0,${tail0} C0,${h*0.9} ${w*0.12},${h*0.985} ${w*0.36},${h} L${w*0.64},${h} C${w*0.88},${h*0.985} ${w},${h*0.9} ${w},${tail0} L${w},${nose} C${w*0.95},${nose*0.5} ${w*0.60},${h*0.018} ${w/2},0 Z`;
+  let o = `<defs>
+    <linearGradient id="${id}g" x1="0" x2="1"><stop offset="0" stop-color="#5c5c5c"/><stop offset=".12" stop-color="#8e8e8e"/><stop offset=".42" stop-color="#a6a6a6"/><stop offset=".7" stop-color="#999"/><stop offset=".9" stop-color="#7a7a7a"/><stop offset="1" stop-color="#4f4f4f"/></linearGradient>
+    <linearGradient id="${id}n" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset=".12" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <filter id="${id}s" x="-20%" y="-5%" width="140%" height="110%"><feDropShadow dx="2" dy="3" stdDeviation="2" flood-color="#000" flood-opacity=".55"/></filter></defs>`;
+  o += `<path d="${p}" fill="url(#${id}g)" stroke="#262626" stroke-width="1.6" filter="url(#${id}s)"/>`;
+  o += `<path d="${p}" fill="url(#${id}n)"/>`;
+  // inner rim highlight (left) and shade (right) for the embossed look
+  o += `<path d="M${w*0.07},${nose*1.05} L${w*0.07},${tail0}" stroke="#c4c4c4" stroke-opacity=".55" stroke-width="2"/>`;
+  o += `<path d="M${w*0.93},${nose*1.05} L${w*0.93},${tail0}" stroke="#3c3c3c" stroke-opacity=".5" stroke-width="2"/>`;
+  // cockpit windshield: white W-shaped panes
+  const wy = h*0.062, wx = w;
+  o += `<path d="M${wx*0.18},${wy+h*0.016} L${wx*0.30},${wy} L${wx*0.44},${wy-h*0.006} L${wx*0.5},${wy+h*0.004} L${wx*0.56},${wy-h*0.006} L${wx*0.70},${wy} L${wx*0.82},${wy+h*0.016}" fill="none" stroke="#f7f7f7" stroke-width="3" stroke-linejoin="round"/>`;
+  o += `<path d="M${wx*0.24},${wy+h*0.026} L${wx*0.34},${wy+h*0.012} M${wx*0.76},${wy+h*0.026} L${wx*0.66},${wy+h*0.012}" stroke="#f7f7f7" stroke-width="2.4" stroke-linecap="round"/>`;
+  o += `<path d="M${wx*0.40},${wy+h*0.006} L${wx*0.5},${wy+h*0.014} L${wx*0.60},${wy+h*0.006}" fill="none" stroke="#3a3a3a" stroke-width="1.2"/>`;
+  // door surrounds: dark bracket notches on both sides
+  if(!opts.noFrames) for(const f of FRAMES){
+    const y=h*f;
+    o += `<path d="M3,${y-9} L-3,${y-9} L-3,${y+9} L3,${y+9}" fill="none" stroke="#1e1e1e" stroke-width="2.2"/>`;
+    o += `<path d="M${w-3},${y-9} L${w+3},${y-9} L${w+3},${y+9} L${w-3},${y+9}" fill="none" stroke="#1e1e1e" stroke-width="2.2"/>`;
+  }
+  return o;
+}
+const FRAMES = [0.19, 0.47, 0.53, 0.885];       // 1, emer fwd, emer aft, 2
+function svgWrap(w, h, inner, padX, padY){ padX=padX??14; padY=padY??14; return `<svg width="${w+padX*2}" height="${h+padY*2}" viewBox="${-padX} ${-padY} ${w+padX*2} ${h+padY*2}">${inner}</svg>`; }
+
+// ================================================================ pages
+const PAGES = {};
+let cur = "sts";
+
+// ---- CABIN STATUS (5 mini aircraft)
+PAGES.sts = {
+  title:"Cabin Status",
+  build: () => {
+    const cols = ["AUDIO","LIGHTS","DOORS / SLIDES","TEMPERATURE","WATER / WASTE"];
+    return cols.map((c,i)=>`<div class="lbl" style="left:${30+i*210}px;width:200px;top:0">${c}</div><div id="stsF${i}" style="position:absolute;left:${56+i*210}px;top:22px"></div>`).join("");
+  },
+  update: s => {
+    const W=120,H=566;
+    // AUDIO
+    const ch = s.music.idx<0?1:s.music.idx+1;
+    let a = fuselage(W,H);
+    a += `<text x="${W/2}" y="${H*0.27}" fill="#fff" font-size="15" text-anchor="middle">BGM ${s.music.playing?"ON":"OFF"}</text>`;
+    a += `<rect x="${W/2-22}" y="${H*0.29}" width="44" height="30" fill="#cfe8fb" stroke="#555" stroke-width="2"/><text x="${W/2}" y="${H*0.29+22}" fill="#111" font-size="20" text-anchor="middle" font-weight="600">${ch}</text>`;
+    a += `<text x="${W/2}" y="${H*0.37}" fill="#fff" font-size="13" text-anchor="middle">CHAN.</text>`;
+    const vh=90, vy=H*0.39;
+    a += `<rect x="${W/2-22}" y="${vy}" width="44" height="${vh}" fill="#e8f2fb" stroke="#555" stroke-width="2"/>`;
+    a += `<rect x="${W/2-20}" y="${vy+vh*(1-s.music.vol)}" width="40" height="${vh*s.music.vol-2}" fill="#3a3d9a"/>`;
+    for(let k=1;k<6;k++) a += `<line x1="${W/2-20}" x2="${W/2+20}" y1="${vy+k*vh/6}" y2="${vy+k*vh/6}" stroke="#fff" stroke-width="1" opacity=".7"/>`;
+    a += `<text x="${W/2}" y="${vy+vh+16}" fill="#fff" font-size="13" text-anchor="middle">VOL.</text>`;
+    if(s.ann.playing) a += `<text x="${W/2}" y="${H*0.66}" fill="#5cff5c" font-size="14" text-anchor="middle">PRAM</text>`;
+    $("stsF0").innerHTML = svgWrap(W,H,a);
+    // LIGHTS
+    let l = fuselage(W,H);
+    const cab = s.light.perc, fe=ui("fe",1), ae=ui("ae",1);
+    const yc = v => v<=0 ? "#9a9a9a" : `rgb(${Math.round(150+105*Math.min(1,v/100+0.25))},${Math.round(150+80*Math.min(1,v/100+0.25))},0)`;
+    const ent = m => m===0?0:m===1?100:m===2?55:25;
+    l += `<rect x="${W*0.3}" y="${H*0.16}" width="${W*0.4}" height="${H*0.06}" fill="${yc(ent(fe))}" stroke="#555"/><text x="${W/2}" y="${H*0.2}" font-size="13" font-weight="700" text-anchor="middle" fill="#222">F/E</text>`;
+    l += `<rect x="${W*0.3}" y="${H*0.24}" width="${W*0.4}" height="${H*0.6}" fill="${yc(cab)}" stroke="#555"/><text x="${W/2}" y="${H*0.27}" font-size="13" font-weight="700" text-anchor="middle" fill="#222">Y/C</text>`;
+    l += `<rect x="${W*0.3}" y="${H*0.855}" width="${W*0.4}" height="${H*0.05}" fill="${yc(ent(ae))}" stroke="#555"/><text x="${W/2}" y="${H*0.89}" font-size="13" font-weight="700" text-anchor="middle" fill="#222">A/E</text>`;
+    $("stsF1").innerHTML = svgWrap(W,H,l);
+    // DOORS
+    let d = fuselage(W,H,{noFrames:true}) + doorMarks(s,W,H,false);
+    $("stsF2").innerHTML = svgWrap(W,H,d);
+    // TEMPERATURE
+    let t = fuselage(W,H);
+    const zones=[[0.15,0.52,s.temp.z1],[0.535,0.9,s.temp.z2]];
+    zones.forEach(([a0,a1,v],i)=>{
+      const n=4, hh=(a1-a0)*H/n;
+      for(let k=0;k<n;k++){ const y=a0*H+k*hh; t += `<rect x="${W*0.27}" y="${y+3}" width="${W*0.46}" height="${hh-6}" fill="#8fd4f7" stroke="#2f5f80"/><text x="${W/2}" y="${y+hh/2+5}" font-size="14" font-weight="700" text-anchor="middle" fill="#111">${(ui("tu",0)?C2F(v):v).toFixed(1)}</text>`; }
+    });
+    t += `<text x="${W/2}" y="${H*0.95}" font-size="14" text-anchor="middle" fill="#fff">°${ui("tu",0)?"F":"C"}</text>`;
+    $("stsF3").innerHTML = svgWrap(W,H,t);
+    // WATER / WASTE
+    let ww = fuselage(W,H);
+    const lavs=[[W*0.14,H*0.205,0],[W*0.14,H*0.905,1],[W*0.8,H*0.905,2]];
+    lavs.forEach(([x,y,i])=>{ const L=s.lav[i]; if(!L) return; const c=L.smoke?"#ff3030":L.occ?"#f2b100":"#f2f2f2"; ww += `<rect x="${x-7}" y="${y-7}" width="14" height="14" fill="${c}" stroke="#333"/>`; });
+    [[W*0.8,H*0.2],[W*0.8,H*0.94]].forEach(([x,y])=>{ ww += `<rect x="${x-7}" y="${y-7}" width="14" height="14" fill="#f2f2f2" stroke="#333"/>`; });
+    ww += `<text x="${W/2}" y="${H*0.45}" font-size="13" text-anchor="middle" fill="#fff">WATER</text><text x="${W/2}" y="${H*0.45+20}" font-size="18" text-anchor="middle" fill="${s.water<15?"#f2b100":"#fff"}">${Math.round(s.water)}%</text>`;
+    ww += `<text x="${W/2}" y="${H*0.57}" font-size="13" text-anchor="middle" fill="#fff">WASTE</text><text x="${W/2}" y="${H*0.57+20}" font-size="18" text-anchor="middle" fill="${s.waste>85?"#f2b100":"#fff"}">${Math.round(s.waste)}%</text>`;
+    $("stsF4").innerHTML = svgWrap(W,H,ww);
+  }
+};
+
+// door markers on a fuselage of size W,H; withLabels for the Doors page
+function doorMarks(s, W, H, withLabels){
+  const names = doorNames(s);
+  let o="";
+  const ys = [FRAMES[0], FRAMES[0], FRAMES[3], FRAMES[3]];
+  s.doors.forEach((d,i)=>{
+    const left = i%2===0, y = H*(ys[i] ?? (0.19 + 0.7*Math.floor(i/2)/Math.max(1,Math.ceil(s.doors.length/2)-1)));
+    const st = doorState(d.pos);
+    const col = d.slide>0.05 ? "#ff3030" : st==="closed" ? "#22d022" : (d.armed ? "#ff3030" : "#f2b100");
+    const x = left ? -11 : W+3;
+    o += `<rect x="${x}" y="${y-11}" width="8" height="22" fill="${col}" stroke="#222" stroke-width="1"/>`;
+    if(!d.armed && d.slide<0.05) o += `<rect x="${left? 2 : W-6}" y="${y-11}" width="4" height="22" fill="#fafafa"/>`;
+    if(withLabels){
+      const tx = left ? -16 : W+16, an = left?"end":"start";
+      o += `<text x="${tx}" y="${y+6}" font-size="17" fill="#fff" text-anchor="${an}">${names[i]}</text>`;
+    }
+  });
+  // overwing emergency exits (A320)
+  if(!(s.icao||"").startsWith("A321")){
+    [[FRAMES[1],0],[FRAMES[2],2]].forEach(([f,k])=>{
+      const y=H*f;
+      [[-11,s.emer[k]],[W+3,s.emer[k+1]]].forEach(([x,v])=>{
+        o += `<rect x="${x}" y="${y-8}" width="8" height="16" fill="${(v||0)>0.01?"#f2b100":"#22d022"}" stroke="#222" stroke-width="1"/>`;
+      });
+      if(withLabels){
+        const lab = k===0?"FWD":"AFT";
+        o += `<text x="-16" y="${y+5}" font-size="14" fill="#fff" text-anchor="end">EMER EXIT ${lab} L</text>`;
+        o += `<text x="${W+16}" y="${y+5}" font-size="14" fill="#fff" text-anchor="start">EMER EXIT ${lab} R</text>`;
+      }
+    });
+  }
+  return o;
+}
+
+// ---- LIGHTS
+PAGES.light = {
+  title:"Cabin Lighting",
+  build: () => {
+    const lvl3 = (id, fn) => `<div class="row">${["BRT","DIM 1","DIM 2"].map((t,i)=>`<button class="key" id="${id}${i+1}" onclick="${fn}(${i+1})">${t}</button>`).join("")}</div>`;
+    return `
+    <div id="lFus" style="position:absolute;left:330px;top:0"></div>
+    <div class="grp" style="left:104px;top:40px;width:218px"><div class="hd">FWD Entry</div>${lvl3("lfe","setEntry.bind(null,'fe')")}</div>
+    <div class="grp" style="left:104px;top:400px;width:218px"><div class="hd">AFT Entry</div>${lvl3("lae","setEntry.bind(null,'ae')")}</div>
+    <div class="grp" style="left:410px;top:110px;width:218px"><div class="hd">Main Cabin</div>${lvl3("lmc","setCabin")}</div>
+    <div class="grp" style="left:410px;top:250px;width:218px"><div class="hd">Level</div>
+      <div class="row"><button class="key sq" onclick="nudgeCabin(-10)">−</button><div class="val" id="lLvl" style="min-width:80px;white-space:nowrap">-</div><button class="key sq" onclick="nudgeCabin(10)">+</button></div></div>
+    <div style="position:absolute;left:410px;top:24px" class="row">
+      <button class="key" id="lMain" onclick="mainOnOff()">Main<br>On/Off</button><span style="width:30px"></span>
+      <button class="key" id="lWdo" onclick="setUi('wdo', ui('wdo',0)?0:1)">WDO</button>
+      <button class="key" id="lAisle" onclick="setUi('aisle', ui('aisle',0)?0:1)">AISLE</button></div>
+    <div style="position:absolute;right:120px;top:24px" class="row">
+      <button class="key" id="lRlS" onclick="setUi('rl',1)">R/L<br>Set</button><button class="key" onclick="setUi('rl',0)">R/L<br>Reset</button></div>
+    <div class="grp" style="left:690px;top:250px;width:330px"><div class="hd">Scenes</div><div class="row" style="flex-wrap:wrap">
+      <button class="key" onclick="scene(1,1,1)">Boarding</button><button class="key" onclick="scene(3,3,3)">TO / LDG</button>
+      <button class="key" onclick="scene(2,2,2)">Meal</button><button class="key" onclick="scene(0,3,0)">Night</button></div></div>`;
+  },
+  update: s => {
+    const W=50,H=470, cab=s.light.perc, fe=ui("fe",1), ae=ui("ae",1);
+    let f = fuselage(W,H);
+    const yc = v => v===0 ? "#8f8f8f" : v===1 ? "#e8e000" : v===2 ? "#bdb52c" : "#8f8a3a";
+    f += `<rect x="8" y="${H*0.16}" width="${W-16}" height="${H*0.04}" fill="${yc(fe)}" stroke="#555"/>`;
+    f += `<rect x="8" y="${H*0.22}" width="${W-16}" height="${H*0.62}" fill="${yc(cabLvl(cab))}" stroke="#555"/>`;
+    f += `<text x="${W/2}" y="${H*0.25}" font-size="10" text-anchor="middle" fill="#333">Y/C</text>`;
+    f += `<rect x="8" y="${H*0.86}" width="${W-16}" height="${H*0.04}" fill="${yc(ae)}" stroke="#555"/>`;
+    $("lFus").innerHTML = svgWrap(W,H,f);
+    [1,2,3].forEach(i=>{ $("lfe"+i).classList.toggle("on",fe===i); $("lae"+i).classList.toggle("on",ae===i); $("lmc"+i).classList.toggle("on",cabLvl(cab)===i); });
+    $("lLvl").textContent = Math.round(cab)+" %";
+    $("lMain").classList.toggle("on", cab>0 || fe>0 || ae>0);
+    $("lWdo").classList.toggle("on", !!ui("wdo",0)); $("lAisle").classList.toggle("on", !!ui("aisle",0)); $("lRlS").classList.toggle("on", !!ui("rl",0));
+  }
+};
+const CAB_LVL = [0,100,50,20];
+function cabLvl(p){ return p<=0?0 : p>=80?1 : p>=35?2 : 3; }
+function setCabin(i){ act("light",{level:CAB_LVL[i]}); setUi("lastCab", i); }
+function setEntry(k, i){ setUi(k, ui(k,1)===i ? 0 : i); }
+function nudgeCabin(d){ act("light",{level:Math.max(0,Math.min(100,Math.round(S.light.perc/10)*10+d))}); }
+function mainOnOff(){
+  const on = S.light.perc>0 || ui("fe",1)>0 || ui("ae",1)>0;
+  if(on){ act("light",{level:0}); setUi("fe",0); setUi("ae",0); }
+  else { act("light",{level:CAB_LVL[ui("lastCab",1)]||100}); setUi("fe",1); setUi("ae",1); }
+}
+function scene(fe, cab, ae){ setUi("fe",fe); setUi("ae",ae); setCabin(cab); }
+
+// ---- TEMPERATURE
+let tZone = "fwd";
+PAGES.temp = {
+  title:"Cabin Temperature",
+  build: () => `
+    <div class="grp" style="left:300px;top:0;width:240px;height:300px"><div class="hd" id="tHd">FWD</div><div id="tTherm" style="position:absolute;left:6px;top:24px"></div>
+      <div style="position:absolute;left:128px;top:30px;width:100px;text-align:center;font-size:14px">SELECTED<br>TEMPERATURE</div>
+      <div class="val" id="tSel" style="position:absolute;left:134px;top:76px;min-width:86px">-</div>
+      <button class="key sq" style="position:absolute;left:150px;top:122px;font-size:22px" onclick="act('temp',{zone:tZone,delta:1})">▲<br><span style="font-size:13px">+</span></button>
+      <button class="key sq" style="position:absolute;left:150px;top:182px;font-size:22px" onclick="act('temp',{zone:tZone,delta:-1})">▼<br><span style="font-size:13px">−</span></button></div>
+    <div class="grp" style="left:300px;top:316px;width:240px;height:150px;text-align:center">
+      <button class="key" onclick="confirmBox('TEMPERATURE','RESET ALL ZONES TO COCKPIT SELECTED TEMPERATURE?',()=>act('temp_reset'),'Reset')">Reset</button>
+      <div style="font-size:14px;margin-top:6px">RESET TO COCKPIT<br>SELECTED TEMPERATURE<br>(ALL AREAS)</div></div>
+    <div id="tFus" style="position:absolute;left:680px;top:0"></div>
+    <button class="key" id="tFwd" style="position:absolute;left:600px;top:110px" onclick="tZone='fwd';render()">FWD</button>
+    <button class="key" id="tAft" style="position:absolute;left:780px;top:290px" onclick="tZone='aft';render()">AFT</button>
+    <div class="lbl" style="left:830px;top:20px;width:200px;font-size:14px;line-height:1.35">COCKPIT<br><span id="tCk" style="font-size:17px"></span></div>`,
+  update: s => {
+    const z = tZone==="aft" ? {act:s.temp.z2, sel:s.temp.sA, n:"AFT"} : {act:s.temp.z1, sel:s.temp.sF, n:"FWD"};
+    $("tHd").textContent = z.n;
+    $("tSel").textContent = tFmt(z.sel);
+    $("tCk").innerHTML = tFmt(s.temp.ck)+"<br>SEL "+tFmt(s.temp.sCk,0);
+    // thermometer 16..30 °C
+    const x0=40, top=10, bot=178, lo=16, hi=30, Y = v => bot-(Math.max(lo,Math.min(hi,v))-lo)/(hi-lo)*(bot-top);
+    let t = `<rect x="${x0}" y="${top}" width="16" height="${bot-top}" fill="#b7c3cc" stroke="#555"/>`;
+    t += `<rect x="${x0+1}" y="${Y(z.act)}" width="14" height="${bot-Y(z.act)}" fill="#353a9e"/>`;
+    for(let v=lo; v<=hi; v+=2){ const y=Y(v); t += `<line x1="${x0-6}" x2="${x0}" y1="${y}" y2="${y}" stroke="#eee"/><text x="${x0-9}" y="${y+5}" font-size="13" fill="#fff" text-anchor="end">${ui("tu",0)?Math.round(C2F(v)):v}</text>`; }
+    t += `<rect x="${x0+18}" y="${Y(z.sel)-14}" width="12" height="28" fill="#cfe8fb" stroke="#4b7fa3"/><path d="M${x0+18},${Y(z.sel)} l-6,-4 v8 z" fill="#2c8a2c"/>`;
+    t += `<rect x="${x0+1}" y="${bot}" width="14" height="30" fill="#353a9e"/><circle cx="${x0+8}" cy="${bot+46}" r="32" fill="#353a9e" stroke="#555" stroke-width="2"/><text x="${x0+8}" y="${bot+52}" font-size="15" fill="#fff" text-anchor="middle">${tFmt(z.act)}</text>`;
+    $("tTherm").innerHTML = `<svg width="120" height="270" viewBox="0 0 120 270">${t}</svg>`;
+    const W=70,H=470;
+    let f = fuselage(W,H);
+    [[0.15,0.52,s.temp.z1,"fwd"],[0.535,0.92,s.temp.z2,"aft"]].forEach(([a,b,v,k])=>{
+      f += `<rect x="8" y="${H*a}" width="${W-16}" height="${H*(b-a)}" fill="#4fd6ff" stroke="${tZone===k?"#22d022":"#3a90b0"}" stroke-width="${tZone===k?3:1}"/>`;
+      f += `<text x="${W/2}" y="${H*(a+b)/2+5}" font-size="14" text-anchor="middle" fill="#111">${(ui("tu",0)?C2F(v):v).toFixed(1)}</text>`;
+    });
+    $("tFus").innerHTML = svgWrap(W,H,f);
+    $("tFwd").classList.toggle("on", tZone==="fwd"); $("tAft").classList.toggle("on", tZone==="aft");
+  }
+};
+
+// ---- DOORS / SLIDES
+PAGES.doors = {
+  title:"Doors / Slides",
+  sig:"",
+  build: () => `
+    <div id="dMsg" style="position:absolute;left:30px;top:30px;width:330px;font-size:17px;line-height:1.6;color:var(--amber)"></div>
+    <div id="dFus" style="position:absolute;left:335px;top:0"></div>
+    <div class="grp" style="left:30px;top:390px;width:300px"><div class="hd">Slides</div>
+      <div class="row"><button class="key wide" onclick="act('arm_slides')">Arm<br>Slides</button><button class="key wide" onclick="act('disarm_slides')">Disarm<br>Slides</button></div></div>
+    <div class="grp" style="left:30px;top:500px;width:300px"><div class="hd">All Doors</div>
+      <div class="row"><button class="key" onclick="act('all_doors',{mode:0})">Close</button><button class="key" onclick="act('all_doors',{mode:1})">Auto</button>
+      <button class="key" onclick="confirmBox('DOORS','OPEN ALL DOORS?',()=>act('all_doors',{mode:2}),'Open')">Open</button></div></div>
+    <div class="grp" style="left:770px;top:0;width:300px"><div class="hd">Door Control</div><div id="dCtl" class="col"></div></div>`,
+  update: s => {
+    const names = doorNames(s);
+    const sig = s.doors.length+"/"+s.cargo.length;
+    if(PAGES.doors.sig!==sig){
+      PAGES.doors.sig=sig;
+      const row = (lab, id, fn) => `<div class="row" style="width:100%;justify-content:space-between"><span style="width:62px;font-size:15px">${lab}</span>${["Close","Auto","Open"].map((t,m)=>`<button class="key" style="min-width:62px;height:44px" id="${id}_${m}" onclick="${fn}(${m})">${t}</button>`).join("")}</div>`;
+      $("dCtl").innerHTML = s.doors.map((d,i)=>row(names[i], "dm"+i, `(m=>act('door_mode',{i:${i},mode:m}))`)).join("")
+        + `<div style="height:6px"></div>` + s.cargo.map((d,i)=>row(["FWD<br>CARGO","AFT<br>CARGO","BULK"][i]||"CARGO", "cm"+i, `(m=>act('cargo_mode',{i:${i},mode:m}))`)).join("");
+    }
+    s.doors.forEach((d,i)=>[0,1,2].forEach(m=>$(`dm${i}_${m}`).classList.toggle("on", d.mode===m)));
+    s.cargo.forEach((d,i)=>[0,1,2].forEach(m=>$(`cm${i}_${m}`).classList.toggle("on", d.mode===m)));
+    const W=90,H=600;
+    $("dFus").innerHTML = svgWrap(W,H, fuselage(W,H,{noFrames:true}) + doorMarks(s,W,H,true), 170, 10);
+    // messages
+    const m=[];
+    s.doors.forEach((d,i)=>{
+      if(d.slide>0.05) m.push(`<span class="redt">SLIDE ${names[i]} DEPLOYED</span>`);
+      else if(doorState(d.pos)!=="closed") m.push(`DOOR ${names[i]} ${doorState(d.pos)==="open"?"OPEN":"MOVING"}`);
+    });
+    s.cargo.forEach((d,i)=>{ if(doorState(d.pos)!=="closed") m.push(`${["FWD CARGO","AFT CARGO","BULK CARGO"][i]||"CARGO"} DOOR OPEN`); });
+    const allClosed = s.doors.every(d=>d.pos<0.01), armed = s.doors.filter(d=>d.armed).length;
+    if(allClosed && armed===0) m.push("SLIDES DISARMED");
+    else if(armed>0 && armed<s.doors.length) m.push("CHECK SLIDE ARMING");
+    if(armed===s.doors.length && armed>0) m.push('<span class="grn">ALL SLIDES ARMED</span>');
+    if(!s.gnd && !allClosed) m.push('<span class="redt">DOOR NOT CLOSED IN FLIGHT</span>');
+    $("dMsg").innerHTML = m.join("<br>");
+  }
+};
+
+// ---- WATER / WASTE
+PAGES.water = {
+  title:"Water / Waste",
+  build: () => `
+    <div class="lbl" style="left:120px;top:4px;width:180px">Waste Quantity</div><div class="lbl" style="left:330px;top:4px;width:180px">Water Quantity</div>
+    <div id="wCyl" style="position:absolute;left:90px;top:26px"></div>
+    <div class="msgHd" style="left:110px;top:300px">Message</div>
+    <div class="msg" id="wMsg" style="left:110px;top:328px;width:500px;height:150px"></div>
+    <div class="grp" style="left:680px;top:20px;width:330px"><div class="hd">Water Preselection</div>
+      <div class="row">${[25,50,75,100].map(p=>`<button class="key" id="wp${p}" onclick="act('water_presel',{pct:${p}})">${p} %</button>`).join("")}</div></div>
+    <div class="grp" style="left:680px;top:130px;width:330px"><div class="hd">Ground Service</div>
+      <div class="row"><button class="key wide" id="wFill" onclick="act('water_fill')">Water<br>Fill</button><button class="key wide" id="wDrain" onclick="act('waste_drain')">Waste<br>Drain</button></div></div>`,
+  update: s => {
+    const cyl = (x, pct, fill, top) => {
+      const w=120,h=200,ry=16, y0=20, fy=y0+h*(1-pct/100);
+      let o = `<ellipse cx="${x+w/2}" cy="${y0+h}" rx="${w/2}" ry="${ry}" fill="${fill}" opacity=".9"/>`;
+      o += `<rect x="${x}" y="${fy}" width="${w}" height="${y0+h-fy}" fill="${fill}" opacity=".9"/>`;
+      o += `<ellipse cx="${x+w/2}" cy="${fy}" rx="${w/2}" ry="${ry}" fill="${top}"/>`;
+      o += `<rect x="${x}" y="${y0}" width="${w}" height="${h}" fill="#ffffff18" stroke="#ddd" stroke-opacity=".5"/>`;
+      o += `<ellipse cx="${x+w/2}" cy="${y0}" rx="${w/2}" ry="${ry}" fill="#ffffff20" stroke="#ddd" stroke-opacity=".6"/>`;
+      o += `<rect x="${x+w*0.25}" y="${y0+4}" width="10" height="${h-4}" fill="#ffffff35"/><rect x="${x+w*0.6}" y="${y0+4}" width="5" height="${h-4}" fill="#ffffff25"/>`;
+      for(const v of [0,25,50,75,100]){ const y=y0+h*(1-v/100); o += `<text x="${x-10}" y="${y+5}" fill="#fff" font-size="14" text-anchor="end">${v}</text><line x1="${x-6}" x2="${x}" y1="${y}" y2="${y}" stroke="#fff"/>`; }
+      o += `<text x="${x-30}" y="${y0-10}" fill="#fff" font-size="13">%</text><text x="${x+w/2}" y="${y0+h+ry+24}" fill="#fff" font-size="20" text-anchor="middle">${Math.round(pct)} %</text>`;
+      return o;
+    };
+    $("wCyl").innerHTML = `<svg width="520" height="270">${cyl(70,s.waste,"#555a66","#6d7380")}${cyl(290,s.water,"#3a3fa6","#5156c4")}</svg>`;
+    [25,50,75,100].forEach(p=>$("wp"+p).classList.toggle("on", s.wpre===p));
+    $("wFill").classList.toggle("on", !!s.wfill); $("wDrain").classList.toggle("on", !!s.wdrain);
+    $("wFill").classList.toggle("dis", !s.gnd); $("wDrain").classList.toggle("dis", !s.gnd);
+    const m=[];
+    if(s.waste>=90) m.push('<span class="redt">WASTE TANK FULL - LAVS INOPERATIVE</span>');
+    else if(s.waste>5 && s.gnd) m.push("WASTE TANK NOT EMPTY - CHECK LEVEL - GROUND SERVICE REQUIRED");
+    if(s.water<15) m.push("WATER QUANTITY LOW");
+    if(s.wfill) m.push(`<span class="w">WATER FILLING TO ${s.wpre} %</span>`);
+    if(s.wdrain) m.push('<span class="w">WASTE DRAINING</span>');
+    if(!s.gnd) m.push('<span class="w">GROUND SERVICE INHIBITED IN FLIGHT</span>');
+    $("wMsg").innerHTML = m.join("<br>");
+  }
+};
+
+// ---- SMOKE DETECT
+PAGES.smoke = {
+  title:"Smoke Detection",
+  build: () => `
+    <div id="sFus" style="position:absolute;left:470px;top:0"></div>
+    <div class="msgHd" style="left:60px;top:40px">Message</div>
+    <div class="msg" id="sMsg" style="left:60px;top:68px;width:360px;height:200px"></div>
+    <div class="grp" style="left:60px;top:300px;width:360px"><div class="hd">Lavatory Status</div><div id="sLav"></div></div>
+    <div class="grp" style="left:720px;top:40px;width:200px"><div class="hd">Smoke Detection</div>
+      <div class="col"><button class="key wide" onclick="act('smoke_test')">Test</button><button class="key wide" onclick="act('smoke_reset')">Reset</button></div></div>`,
+  update: s => {
+    const W=90,H=520;
+    let f = fuselage(W,H);
+    const pos=[[W*0.25,H*0.2],[W*0.25,H*0.895],[W*0.75,H*0.895]];
+    s.lav.forEach((l,i)=>{ const [x,y]=pos[i]; const c=l.smoke?"#ff3030":l.occ?"#f2b100":"#f2f2f2";
+      f += `<rect x="${x-14}" y="${y-14}" width="28" height="28" fill="${c}" stroke="#333"/><text x="${x}" y="${y+6}" font-size="16" text-anchor="middle" fill="#111">${l.n}</text>`; });
+    $("sFus").innerHTML = svgWrap(W,H,f);
+    const sm = s.lav.filter(l=>l.smoke);
+    $("sMsg").innerHTML = (sm.length ? sm.map(l=>`<span class="redt">SMOKE LAV ${l.n}${s.smokeTest?" (TEST)":""}</span>`).join("<br>") : '<span class="w">NO SMOKE DETECTED</span>')
+      + (s.lavMaint ? '<br>LAV MAINTENANCE MODE ACTIVE' : "");
+    $("sLav").innerHTML = s.lav.map(l=>`<div class="row" style="justify-content:space-between;padding:3px 6px"><span>LAV ${l.n}</span><span class="${l.smoke?"redt":l.occ?"amb":"grn"}">${l.smoke?"SMOKE":l.occ?"OCCUPIED":"VACANT"}</span></div>`).join("");
+  }
+};
+
+// ---- AUDIO (layout after the A320 CIDS audio page)
+const SEL_ROWS = 18;
+let annSel = 0, memoSel = -1;
+PAGES.audio = {
+  title:"Audio",
+  sig:"",
+  build: () => `
+    <div id="auFus" style="position:absolute;left:8px;top:14px"></div>
+    <div class="lbl" style="left:120px;top:14px;width:220px;font-size:13px">Boarding Music</div>
+    <div class="grp" style="left:122px;top:36px;width:216px;height:196px"><div class="hd">BGM1</div>
+      <div class="lb" id="bgmList" style="left:30px;top:30px;width:150px;height:150px"></div></div>
+    <div class="grp" style="left:122px;top:246px;width:216px;height:176px"><div class="hd">BGM1</div>
+      <button class="key sq" id="bgmOn" style="position:absolute;left:12px;top:34px">ON<br>OFF</button>
+      <button class="key sq" style="position:absolute;left:78px;top:34px" onclick="vol(0.1)">${ARROW_U}</button>
+      <button class="key sq" style="position:absolute;left:144px;top:34px" onclick="chan(-1)">${ARROW_U}</button>
+      <button class="key sq" style="position:absolute;left:78px;top:94px" onclick="vol(-0.1)">${ARROW_D}</button>
+      <button class="key sq" style="position:absolute;left:144px;top:94px" onclick="chan(1)">${ARROW_D}</button>
+      <div style="position:absolute;left:78px;top:152px;width:54px;text-align:center;font-size:12px">VOL.</div>
+      <div style="position:absolute;left:144px;top:152px;width:54px;text-align:center;font-size:12px">CHAN.</div></div>
+    <div class="grp" style="left:122px;top:436px;width:216px"><div class="hd">Chimes</div>
+      <div class="row" style="flex-wrap:wrap;gap:6px"><button class="key" style="min-width:88px;height:44px" onclick="act('chime',{t:'single'})">Hi</button><button class="key" style="min-width:88px;height:44px" onclick="act('chime',{t:'lo'})">Lo</button><button class="key" style="min-width:88px;height:44px" onclick="act('chime',{t:'hilo'})">Hi-Lo</button><button class="key" style="min-width:88px;height:44px" onclick="act('chime',{t:'tri'})">Tri-Tone</button></div></div>
+
+    <div class="lbl" style="left:360px;top:14px;width:720px;font-size:13px">Prerecorded Announcement</div>
+    <div class="grp" style="left:360px;top:36px;width:722px;height:556px">
+      <div class="sub" style="left:10px;top:10px;width:400px;height:530px"></div>
+      <div class="lbl" style="left:24px;top:18px;width:190px;font-size:12px">On Announce</div>
+      <div id="onAnn" style="position:absolute;left:24px;top:38px;width:190px;height:40px;background:linear-gradient(#8fd0f7,#4fa6e2);border:2px solid;border-color:#3d6f94 #d6eefc #d6eefc #3d6f94;color:#08223a;font-size:14px;padding:3px 6px;overflow:hidden;line-height:1.2"></div>
+      <div class="lbl" style="left:24px;top:94px;width:190px;font-size:12px">Memo</div>
+      <div class="lb" id="memoList" style="left:24px;top:114px;width:190px;height:340px"></div>
+      <div class="track" style="left:378px;top:24px;height:150px"></div><div class="track" style="left:378px;top:330px;height:150px"></div>
+      <button class="key sq" style="position:absolute;left:232px;top:140px" onclick="memoStep(-1)">${ARROW_U}</button>
+      <button class="key sq" style="position:absolute;left:232px;top:224px;font-size:12px" onclick="act('memo_clear');memoSel=-1">Clear<br>All</button>
+      <button class="key sq" style="position:absolute;left:232px;top:308px" onclick="memoStep(1)">${ARROW_D}</button>
+      <button class="key sq" style="position:absolute;left:304px;top:196px" onclick="memoAdd()">${ARROW_LT}</button>
+      <button class="key sq" style="position:absolute;left:304px;top:256px" onclick="memoDel()">${ARROW_RT}</button>
+      <button class="key sq" style="position:absolute;left:24px;top:470px" onclick="act('ann_stop')">Stop</button>
+      <button class="key sq" style="position:absolute;left:90px;top:470px" onclick="act('memo_next');memoSel=-1">Play<br>Next</button>
+      <button class="key sq" style="position:absolute;left:156px;top:470px" onclick="act('memo_all')">Play<br>All</button>
+      <div class="lbl" style="left:428px;top:12px;width:214px;font-size:12px">Select</div>
+      <div class="lb" id="selList" style="left:428px;top:32px;width:214px;height:${18+SEL_ROWS*24+4}px"></div>
+      <button class="key sq" style="position:absolute;left:652px;top:34px;font-size:12px" onclick="selStep(-SEL_ROWS)">Prev<br>Page</button>
+      <button class="key sq" style="position:absolute;left:652px;top:106px" onclick="selStep(-1)">${ARROW_U}</button>
+      <button class="key sq" style="position:absolute;left:652px;top:178px;font-size:12px" onclick="openClose()">Open/<br>Close</button>
+      <button class="key sq" style="position:absolute;left:652px;top:250px;font-size:12px" onclick="directPlay()">Direct<br>Play</button>
+      <button class="key sq" style="position:absolute;left:652px;top:322px" onclick="selStep(1)">${ARROW_D}</button>
+      <button class="key sq" style="position:absolute;left:652px;top:394px;font-size:12px" onclick="selStep(SEL_ROWS)">Next<br>Page</button>
+      <div class="amb" id="aMsg" style="position:absolute;left:428px;top:510px;width:280px;font-size:13px"></div>
+    </div>`,
+  update: s => {
+    // mini aircraft: BGM status
+    const W=64,H=540, idx=s.music.idx<0?0:s.music.idx;
+    let f = fuselage(W,H);
+    f += `<text x="${W/2}" y="${H*0.24}" fill="#fff" font-size="12" text-anchor="middle">BGM1</text>`;
+    f += `<rect x="6" y="${H*0.25}" width="${W-12}" height="22" fill="${s.music.playing?"#3ee03e":"#8fd0f7"}" stroke="#3d6f94"/><text x="${W/2}" y="${H*0.25+16}" fill="#111" font-size="13" text-anchor="middle" font-weight="700">${s.music.playing?"ON":"OFF"}</text>`;
+    f += `<text x="${W/2}" y="${H*0.32}" fill="#fff" font-size="11" text-anchor="middle">CHAN. ${s.music.files.length?idx+1:"-"}</text>`;
+    const vh=80, vy=H*0.34;
+    f += `<rect x="${W/2-12}" y="${vy}" width="24" height="${vh}" fill="#e8f2fb" stroke="#555"/>`;
+    f += `<rect x="${W/2-10}" y="${vy+vh*(1-s.music.vol)}" width="20" height="${Math.max(0,vh*s.music.vol-2)}" fill="#3a3d9a"/>`;
+    for(let k=1;k<8;k++) f += `<line x1="${W/2-10}" x2="${W/2+10}" y1="${vy+k*vh/8}" y2="${vy+k*vh/8}" stroke="#fff" opacity=".8"/>`;
+    f += `<text x="${W/2}" y="${vy+vh+14}" fill="#fff" font-size="11" text-anchor="middle">VOL.</text>`;
+    $("auFus").innerHTML = svgWrap(W,H,f);
+    // BGM channel list
+    // livery channels first under a LIVERY header, then the general ones
+    const liv = s.music.liv||0, secH = t => `<div class="it" style="height:18px;line-height:18px;font-size:11px;font-weight:700;color:#5b6a78;background:#eef3f7;cursor:default">${t}</div>`;
+    $("bgmList").innerHTML = `<div class="hdr"></div>` + (s.music.files.length
+      ? s.music.files.map((n,i)=>(liv && i===0 ? secH("LIVERY") : "") + (liv && i===liv ? secH("GENERAL") : "")
+          + `<div class="it${i===idx?" sel":""}" onclick="pickChan(${i})">${esc(n)}</div>`).join("")
+      : `<div class="it" style="white-space:normal;height:auto;color:#666;font-size:12px">Put .wav files in<br>sounds/music</div>`);
+    $("bgmOn").classList.toggle("on", !!s.music.playing);
+    $("bgmOn").onclick = bgmOnOff;
+    // on announce + memo
+    $("onAnn").textContent = s.ann.playing ? annLabel(s.ann.idx) + (s.ann.queue? `  (+${s.ann.queue})`:"") : "";
+    const memo = s.ann.memo||[];
+    if(memoSel>=memo.length) memoSel = memo.length-1;
+    $("memoList").innerHTML = `<div class="hdr"></div>` + memo.map((k,p)=>`<div class="it${p===memoSel?" sel":""}" onclick="memoSel=${p};render()">${esc(annLabel(k))}</div>`).join("");
+    // select list (paged)
+    const rows = annRows(s.ann.files);
+    if(annSel>=rows.length) annSel = Math.max(0, rows.length-1);
+    const page = Math.floor(annSel/SEL_ROWS), from = page*SEL_ROWS;
+    $("selList").innerHTML = `<div class="hdr"></div>` + (rows.length
+      ? rows.slice(from, from+SEL_ROWS).map((r,j)=>{ const k=from+j;
+          const cls = `it${k===annSel?" sel":""}${r.type==="file"&&s.ann.playing&&s.ann.idx===r.i?" play":""}`;
+          const pad = r.depth*14 + 4;
+          const label = r.type==="dir" ? `${annOpen.has(r.path)?"▾":"›"} ${esc(r.name)}` : esc(r.name);
+          return `<div class="${cls}" style="padding-left:${pad}px" onclick="rowTap(${k})">${label}</div>`; }).join("")
+      : `<div class="it" style="white-space:normal;height:auto;color:#666;font-size:12px">No announcements.<br>Put .wav files (or folders of<br>them) in sounds/announcements</div>`);
+    $("aMsg").textContent = s.audioMsg||"";
+  }
+};
+const ARROW_U = `<svg width="26" height="22" viewBox="0 0 26 22"><path d="M13,2 L24,20 L2,20 Z" fill="#111"/></svg>`;
+const ARROW_D = `<svg width="26" height="22" viewBox="0 0 26 22"><path d="M2,2 L24,2 L13,20 Z" fill="#111"/></svg>`;
+const ARROW_LT = `<svg width="30" height="24" viewBox="0 0 30 24"><path d="M2,12 L13,2 L13,8 L28,8 L28,16 L13,16 L13,22 Z" fill="#111"/></svg>`;
+const ARROW_RT = `<svg width="30" height="24" viewBox="0 0 30 24"><path d="M28,12 L17,2 L17,8 L2,8 L2,16 L17,16 L17,22 Z" fill="#111"/></svg>`;
+// --- announcement tree (folders under sounds/announcements) ---
+const annOpen = new Set();
+function annRows(files){
+  // files are "Folder/Sub/Name" paths, sorted; folders appear where their first file does
+  const rows = [], seen = new Set();
+  files.forEach((p,i)=>{
+    const parts = p.split("/");
+    let visible = true;
+    for(let d=0; d<parts.length-1 && visible; d++){
+      const path = parts.slice(0,d+1).join("/");
+      if(!seen.has(path)){ seen.add(path); rows.push({type:"dir", path, name:parts[d], depth:d}); }
+      visible = annOpen.has(path);
+    }
+    if(visible) rows.push({type:"file", i, name:parts[parts.length-1], depth:parts.length-1});
+  });
+  return rows;
+}
+function curRow(){ return annRows(S.ann.files)[annSel]; }
+function toggleDir(path){ if(annOpen.has(path)) annOpen.delete(path); else annOpen.add(path); render(); }
+function rowTap(k){ const r=annRows(S.ann.files)[k]; if(r && r.type==="dir" && k===annSel) toggleDir(r.path); else { annSel=k; render(); } }
+function openClose(){
+  const r=curRow(); if(!r) return;
+  if(r.type==="dir") return toggleDir(r.path);
+  const parent = S.ann.files[r.i].split("/").slice(0,-1).join("/");
+  if(parent){ annOpen.delete(parent); annSel = annRows(S.ann.files).findIndex(x=>x.type==="dir"&&x.path===parent); render(); }
+}
+const annLabel = i => (S.ann.files[i]||"?").split("/").join(" › ");
+function selStep(d){ const n=annRows(S.ann.files).length; if(!n) return; annSel=Math.max(0,Math.min(n-1,annSel+d)); render(); }
+function memoStep(d){ const n=(S.ann.memo||[]).length; if(!n) return; memoSel = memoSel<0 ? (d>0?0:n-1) : Math.max(0,Math.min(n-1,memoSel+d)); render(); }
+async function memoAdd(){
+  const r=curRow(); if(!r) return toast("NO ANNOUNCEMENT");
+  if(r.type==="file") return act("memo_add",{i:r.i});
+  // a folder: queue every file inside it, in order (e.g. one announcement in all languages)
+  const idx = S.ann.files.map((p,i)=>[p,i]).filter(([p])=>p.startsWith(r.path+"/")).map(([,i])=>i);
+  for(const i of idx){ const res = await act("memo_add",{i}); if(res && res.ok===false) break; }
+}
+function memoDel(){ if(memoSel<0) return toast("SELECT MEMO ENTRY"); act("memo_del",{p:memoSel}); }
+function directPlay(){
+  const r=curRow(); if(!r) return toast("NO ANNOUNCEMENT");
+  if(r.type==="dir") return toggleDir(r.path);
+  act("ann_play",{i:r.i});
+}
+function pickChan(i){ act(S.music.playing?"music_play":"music_sel",{i}); }
+function chan(d){ const n=S.music.files.length; if(!n) return; const i=((S.music.idx<0?0:S.music.idx)+d+n)%n; pickChan(i); }
+function bgmOnOff(){ if(S.music.playing) act("music_stop"); else act("music_play",{i:S.music.idx<0?0:S.music.idx}); }
+function vol(d){ act("music_vol",{v:Math.max(0,Math.min(1,Math.round((S.music.vol+d)*10)/10))}); }
+
+// ---- CALLS
+PAGES.calls = {
+  title:"Calls",
+  build: () => `
+    <div class="msgHd" style="left:60px;top:10px">Call List</div>
+    <div class="msg" id="cList" style="left:60px;top:38px;width:640px;height:440px;color:#fff;overflow-y:auto"></div>
+    <div class="grp" style="left:740px;top:10px;width:290px"><div class="hd">Call Cockpit</div>
+      <div class="row"><button class="key wide" id="cCapt" onclick="act('call_capt')">Capt</button>
+      <button class="key wide red" onclick="confirmBox('EMERGENCY','EMERGENCY CALL TO COCKPIT?',()=>act('call_capt_emer'),'Call')">Emer<br>Call</button></div></div>
+    <div class="grp" style="left:740px;top:130px;width:290px"><div class="hd">Cabin</div>
+      <div class="row" style="flex-wrap:wrap"><button class="key wide" onclick="act('call_attnd')">All<br>Attnd</button><button class="key wide" onclick="act('call_reset',{id:-1})">Reset<br>All</button>
+      <button class="key wide" onclick="act('call_clear')">Clear<br>List</button></div></div>`,
+  update: s => {
+    $("cList").innerHTML = s.calls.length ? s.calls.map(c=>`<div class="row" style="justify-content:flex-start;gap:14px;padding:4px 0;border-bottom:1px solid #ffffff22">
+      <span style="width:60px">${esc(c.tm)}</span><span style="width:110px">${esc(c.src)}</span>
+      <span style="flex:1" class="${c.act?(c.prio===2?"redt":"amb"):""}">${esc(c.txt)}</span>
+      ${c.act?`<button class="key" style="height:38px;min-width:70px" onclick="act('call_reset',{id:${c.id}})">Reset</button>`:'<span style="opacity:.6;width:70px;text-align:center">ACK</span>'}</div>`).join("") : "NO CALLS";
+    $("cCapt").classList.toggle("on", !!s.ckptCall);
+  }
+};
+
+// ---- EVAC
+PAGES.evac = {
+  title:"Evacuation",
+  build: () => `
+    <div class="grp" style="left:120px;top:20px;width:380px;height:260px;text-align:center"><div class="hd">Evac Status</div>
+      <div id="eBox" style="margin:20px auto;width:220px;height:100px;display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:600;border:3px solid #444"></div>
+      <div id="eSel" style="font-size:15px"></div></div>
+    <div class="grp" style="left:560px;top:20px;width:400px;height:260px"><div class="hd">Evac Command</div>
+      <div class="col" style="gap:10px;margin-top:10px"><button class="key red wide" style="height:70px;min-width:200px;font-size:20px" onclick="confirmBox('EVACUATION','COMMAND EVACUATION?',()=>act('evac_cmd'),'Evac')">EVAC<br>CMD</button>
+      <div class="row"><button class="key wide" onclick="act('horn_off')">Horn<br>Shut Off</button><button class="key wide" onclick="act('evac_reset')">Evac<br>Reset</button></div></div></div>
+    <div class="msgHd" style="left:120px;top:310px">Message</div>
+    <div class="msg" id="eMsg" style="left:120px;top:338px;width:840px;height:130px"></div>`,
+  update: s => {
+    const on = s.evac.light || s.evac.btn;
+    const b=$("eBox"); b.textContent = on ? "EVAC" : "NORMAL"; b.style.background = on ? "var(--red)" : "#1f9b1f";
+    $("eSel").textContent = "COCKPIT SELECTOR: " + (s.evac.sel ? "CAPT & PURS" : "CAPT");
+    const m=[];
+    if(on) m.push('<span class="redt">EVACUATION COMMANDED</span>');
+    if(s.oxy) m.push("PAX OXYGEN MASKS DEPLOYED");
+    m.push(`<span class="w">CABIN ALTITUDE ${Math.round(s.cabAlt)} FT</span>`);
+    $("eMsg").innerHTML = m.join("<br>");
+  }
+};
+
+// ---- SYSTEM INFO
+PAGES.sys = {
+  title:"System Info",
+  build: () => `<div class="msgHd" style="left:160px;top:20px">System</div><div class="msg" id="iInfo" style="left:160px;top:48px;width:780px;height:300px;color:#fff"></div>`,
+  update: s => {
+    $("iInfo").innerHTML = `CIDS / FAP SIMULATION &nbsp; V${esc(s.v)}<br>AIRCRAFT: ${esc(s.icao||"?")}<br>
+      TOLISS LINK: ${s.toliss?'<span class="g">OK</span>':'<span class="r">NOT FOUND</span>'}<br>
+      BRIDGE: ${HAS_XP?"X-PLANE":"BROWSER PREVIEW"}<br>FLIGHT PHASE: ${s.phase} &nbsp; ${s.gnd?"ON GROUND":"IN FLIGHT"}<br>
+      PAX ON BOARD: ${s.pax}<br>LIVERY: ${esc(s.livery||"default")}<br>CABIN PA LEVEL AT YOUR POSITION: ${Math.round((s.gain??1)*100)} %<br>UTC: ${esc(s.utc)}<br><br>
+      <span class="w" style="font-size:14px">COMMANDS: toliss_fap/toggle_popup · toliss_fap/pop_out · toliss_fap/reload · toliss_fap/toggle_debug_quad</span>`;
+  }
+};
+
+// ---- FAP CONFIG
+PAGES.cfg = {
+  title:"FAP Config",
+  build: () => `
+    <div class="grp" style="left:160px;top:20px;width:360px"><div class="hd">Screen Brightness</div>
+      <div class="row"><button class="key sq" onclick="act('bright',{v:Math.max(.05,Math.round((S.bright-(S.bright>.2?.1:.05))*100)/100)})">−</button><div class="val" id="gBr">-</div><button class="key sq" onclick="act('bright',{v:Math.min(1,Math.round((S.bright+(S.bright>=.2?.1:.05))*100)/100)})">+</button></div></div>
+    <div class="grp" style="left:580px;top:20px;width:360px"><div class="hd">Temp. Unit</div>
+      <div class="row"><button class="key" id="gC" onclick="setUi('tu',0)">°C</button><button class="key" id="gF" onclick="setUi('tu',1)">°F</button></div></div>
+    <div class="grp" style="left:160px;top:150px;width:360px"><div class="hd">Debug Screen (Cockpit)</div>
+      <div class="row"><button class="key" id="gDy" onclick="act('debug_quad',{on:1})">Show</button><button class="key" id="gDn" onclick="act('debug_quad',{on:0})">Hide</button></div></div>
+    <div class="grp" style="left:580px;top:150px;width:360px"><div class="hd">Audio Files</div>
+      <div class="row"><button class="key wide" onclick="act('rescan')">Rescan</button></div></div>`,
+  update: s => {
+    $("gBr").textContent = Math.round(s.bright*100)+" %";
+    $("gC").classList.toggle("on", !ui("tu",0)); $("gF").classList.toggle("on", !!ui("tu",0));
+    $("gDy").classList.toggle("on", !!s.debugQuad); $("gDn").classList.toggle("on", !s.debugQuad);
+  }
+};
+
+// ---- CAUTION list
+PAGES.caut = {
+  title:"Cautions",
+  build: () => `<div class="msgHd" style="left:160px;top:20px">Caution Messages</div><div class="msg" id="kList" style="left:160px;top:48px;width:780px;height:420px"></div>`,
+  update: s => { const c=cautions(s); $("kList").innerHTML = c.length ? c.join("<br>") : '<span class="w">NO CAUTION</span>'; }
+};
+function cautions(s){
+  const c=[];
+  if(s.lav.some(l=>l.smoke)) c.push('<span class="redt">SMOKE '+s.lav.filter(l=>l.smoke).map(l=>"LAV "+l.n).join(", ")+'</span>');
+  if(s.evac.light||s.evac.btn) c.push('<span class="redt">EVACUATION</span>');
+  s.calls.filter(c2=>c2.act && c2.prio===2).forEach(c2=>c.push(`<span class="redt">EMER CALL ${esc(c2.src)}</span>`));
+  if(s.doors.some(d=>d.slide>0.05)) c.push("SLIDE DEPLOYED");
+  if(!s.gnd && s.doors.some(d=>d.pos>0.01)) c.push("DOOR NOT CLOSED");
+  if(s.waste>=90) c.push("WASTE TANK FULL");
+  if(s.water<10) c.push("WATER QUANTITY LOW");
+  return c;
+}
+
+// ================================================================ shell
+// two pages of 9 slots, like the real FAP menu bar; null = empty slot
+const NAV_PAGES = [
+  [["audio","Audio"],["light","Lights"],["doors","Door/<br>Slides"],["temp","Temp"],["water","Water/<br>Waste"],["smoke","Smoke<br>Detect"],null,null,["sys","System<br>Info"]],
+  [["calls","Calls"],["evac","Evac"],["caut","Caution<br>List"],["cfg","FAP<br>Config"],null,null,null,null,null],
+];
+let navPage = 0;
+const ARROW_L = `<svg width="30" height="30" viewBox="0 0 30 30"><path d="M24,4 L6,15 L24,26 Z" fill="currentColor"/></svg>`;
+const ARROW_R = `<svg width="30" height="30" viewBox="0 0 30 30"><path d="M6,4 L24,15 L6,26 Z" fill="currentColor"/></svg>`;
+function buildNav(){
+  const items = NAV_PAGES[navPage];
+  const last = NAV_PAGES.length-1;
+  $("nav").innerHTML =
+    `<button class="key arrow${navPage===0?" ghost":""}" onclick="navStep(-1)">${ARROW_L}</button>` +
+    items.map(it => it ? `<button class="key" id="nav_${it[0]}" onclick="go('${it[0]}')">${it[1]}</button>` : `<button class="key" style="cursor:default"></button>`).join("") +
+    `<button class="key arrow${navPage===last?" ghost":""}" onclick="navStep(1)">${ARROW_R}</button>`;
+  // scroll indicator: green window over the half of the menu currently shown
+  const f=$("navFill"), w = 100/NAV_PAGES.length;
+  f.style.left = `calc(${navPage*w}% + 2px)`; f.style.width = `calc(${w}% - 4px)`;
+  markNav();
+}
+function navStep(d){
+  const n = navPage + d;
+  if(n<0 || n>=NAV_PAGES.length) return;
+  navPage = n; buildNav();
+}
+function markNav(){
+  NAV_PAGES[navPage].forEach(it=>{ if(it) $("nav_"+it[0]).classList.toggle("on", it[0]===cur); });
+}
+function go(k){
+  cur=k;
+  const p=PAGES[k];
+  $("title").textContent = p.title.toUpperCase();
+  $("main").innerHTML = p.build();
+  if(p.sig!==undefined) p.sig="";
+  // follow the menu to the page that holds this item
+  const pg = NAV_PAGES.findIndex(list=>list.some(it=>it && it[0]===k));
+  if(pg>=0 && pg!==navPage){ navPage=pg; buildNav(); } else markNav();
+  $("kSts").classList.toggle("on", k==="sts");
+  $("kCfg").classList.toggle("on", k==="cfg");
+  if(S) render();
+}
+$("kSts").onclick = ()=>go("sts");
+$("kCfg").onclick = ()=>go("cfg");
+$("kCaut").onclick = ()=>go("caut");
+$("kReady").onclick = ()=>act("cabin_ready",{on:S&&S.cabinReady?0:1});
+$("kScr").onclick = ()=>{ $("scrOff").style.display="block"; };
+$("scrOff").onclick = ()=>{ $("scrOff").style.display="none"; };
+let bannerAct=null;
+$("banner").onclick = ()=>{ if(bannerAct) bannerAct(); };
+
+// power-up sequence
+let lastPwr = 0, bootT = 0;
+function boot(){
+  const o=$("boot"), f=$("bootFill"); o.style.display="block"; f.style.width="0";
+  const t0=performance.now(), dur=5000; cancelAnimationFrame(bootT);
+  const step=t=>{ const p=Math.min(1,(t-t0)/dur); f.style.width=(p*100)+"%"; if(p<1) bootT=requestAnimationFrame(step); else o.style.display="none"; };
+  bootT=requestAnimationFrame(step);
+}
+
+function render(){
+  const s=S;
+  $("off").style.display = s.pwr ? "none" : "block";
+  // screen brightness: X-Plane does not dim browser screens, so the page dims itself
+  $("dimmer").style.opacity = Math.max(0, Math.min(0.94, 1 - (s.effBright ?? s.bright ?? 1)));
+  if(s.pwr && !lastPwr) boot();
+  lastPwr = s.pwr;
+  $("kReady").classList.toggle("on", !!s.cabinReady);
+  if(s.offImg && $("scrOff").dataset.src !== s.offImg){ $("scrOff").dataset.src = s.offImg; $("scrOff").style.backgroundImage = `url("${s.offImg}")`; }
+  $("lockOv").style.display = s.lock>0 ? "flex" : "none"; if(s.lock>0) $("lockS").textContent = s.lock;
+  const c = cautions(s);
+  $("kCaut").classList.toggle("amb", c.length>0); $("kCaut").classList.toggle("ghost", c.length===0);
+  // banner: smoke > emergency/priority call
+  const smoke = s.lav.some(l=>l.smoke), top = s.calls.find(x=>x.act && x.prio>0), b=$("banner");
+  if(smoke){ b.style.display="block"; b.className="emer"; b.textContent=(s.smokeTest?"SMOKE TEST":"SMOKE")+" - "+s.lav.filter(l=>l.smoke).map(l=>"LAV "+l.n).join(" ")+"   [RESET]"; bannerAct=()=>act("smoke_reset"); }
+  else if(top){ b.style.display="block"; b.className= top.prio===2?"emer":""; b.textContent=`${top.src}: ${top.txt}   [RESET]`; bannerAct=()=>act("call_reset",{id:top.id}); }
+  else { b.style.display="none"; bannerAct=null; }
+  try{ PAGES[cur].update(s); }catch(e){ if(HAS_XP && xplane.log) xplane.log({err:String(e),stack:String(e.stack||""),page:cur}); else console.error(e); }
+}
+
+let polling=false;
+async function poll(){
+  if(polling) return; polling=true;
+  try{ const s = await getState(); if(s && s.doors){ S=s; render(); } }
+  finally{ polling=false; }
+}
+// Touch input from the plugin (3D cockpit clicks) + de-duplication against native clicks.
+let lastClk = {t:0, x:-99, y:-99};
+document.addEventListener("click", e => {
+  const now = performance.now();
+  if(now - lastClk.t < 350 && Math.abs(e.clientX-lastClk.x) < 14 && Math.abs(e.clientY-lastClk.y) < 14){
+    e.stopImmediatePropagation(); e.preventDefault(); return;
+  }
+  lastClk = {t:now, x:e.clientX, y:e.clientY};
+}, true);
+window.fapTouch = function(x, y){
+  const el = document.elementFromPoint(x, y);
+  if(!el) return;
+  const o = {bubbles:true, cancelable:true, clientX:x, clientY:y, view:window};
+  el.dispatchEvent(new PointerEvent("pointerdown", o)); el.dispatchEvent(new MouseEvent("mousedown", o));
+  el.dispatchEvent(new PointerEvent("pointerup", o));   el.dispatchEvent(new MouseEvent("mouseup", o));
+  el.dispatchEvent(new MouseEvent("click", o));
+};
+// dev: index.html#temp,noboot opens a page directly and skips the power-up
+const HASH = location.hash.slice(1).split(",");
+if(HASH.includes("noboot")) lastPwr = 1;
+buildNav(); go(PAGES[HASH[0]] ? HASH[0] : "sts"); poll(); setInterval(poll, 250);
+detectXP();
+</script>
+</body>
+</html>
