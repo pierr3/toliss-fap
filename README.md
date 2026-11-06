@@ -1,9 +1,9 @@
-# ToLiss FAP: Flight Attendant Panel for the ToLiss A320
+# ToLiss FAP: Flight Attendant Panel for the ToLiss A320 and A321
 
-A working Airbus CIDS **Flight Attendant Panel** for the ToLiss A320 in X-Plane 12.
+A working Airbus CIDS **Flight Attendant Panel** for the ToLiss A320 and A321 in X-Plane 12.
 It sits on the forward-entry wall behind the cockpit. You can click it in 3D or open it as a popup or a separate window.
 
-![The FAP in the cockpit](docs/img/sim_cockpit.jpg)
+![The FAP on the forward galley wall, Audio page, in the sim](docs/img/sim_cockpit.jpg)
 
 > [!NOTE]
 > This is a free community add-on. It is **not affiliated with ToLiss or Airbus**.
@@ -28,6 +28,7 @@ It sits on the forward-entry wall behind the cockpit. You can click it in 3D or 
   - Caution list
 - **Hooked into the ToLiss systems:**
   - Door modes (Close / Auto / Open), including cargo doors
+  - A321 exit configurations (classic 4 doors and the three "Cabin Flex" overwing-exit layouts): the Doors page shows the doors and exits of the current configuration
   - Cabin light level
   - Forward and aft cabin temperature (the cockpit knobs move with it)
   - The **Cabin Ready** button raises *CABIN READY* on the ECAM.
@@ -56,7 +57,7 @@ It sits on the forward-entry wall behind the cockpit. You can click it in 3D or 
 |---|---|
 | ![Cabin status](docs/img/page_sts.png) | ![Audio](docs/img/page_audio.png) |
 | ![Doors](docs/img/page_doors.png) | ![Lighting](docs/img/page_light.png) |
-| ![3D hardware](docs/img/hw_34.jpg) | ![Night lighting in the sim](docs/img/sim_lighting.jpg) |
+| ![The panel and the cockpit door keypad in the sim](docs/img/sim_panel.jpg) | ![Night lighting in the sim](docs/img/sim_lighting.jpg) |
 
 ## Install
 
@@ -70,8 +71,7 @@ It sits on the forward-entry wall behind the cockpit. You can click it in 3D or 
 **Requirements:**
 - Windows 10/11
 - X-Plane **12.4+** (needed for the browser avionics API)
-- ToLiss A320 (Neo)
-- A321: not supported yet.
+- ToLiss A320 (Neo) and/or ToLiss A321 (Neo/LR). The installer finds both and asks which ones to install into.
 
 **After every ToLiss update,** run the installer again. ToLiss updates replace the cockpit object and the `.acf`.
 

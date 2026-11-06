@@ -1,7 +1,7 @@
 ToLiss FAP - USER GUIDE
 =======================
 
-This adds a working Flight Attendant Panel (FAP) to the ToLiss A320 in X-Plane 12.
+This adds a working Flight Attendant Panel (FAP) to the ToLiss A320 and A321 in X-Plane 12.
 It sits on the wall at the front door, behind the cockpit.
 
 
@@ -9,7 +9,7 @@ WHAT YOU NEED
 -------------
 - Windows 10 or 11
 - X-Plane 12.4 or newer
-- The ToLiss A320 (Neo)
+- The ToLiss A320 (Neo) and/or the ToLiss A321
 
 
 INSTALL (2 minutes)
@@ -17,10 +17,11 @@ INSTALL (2 minutes)
 1. Close X-Plane.
 2. Unzip the download anywhere (your Desktop is fine).
 3. Double-click  "Install FAP.bat".
-4. If it asks, pick your ToLiss A320 folder
+4. If you have both the A320 and the A321, it asks which one:
+   press Enter for both. If it cannot find them, pick the aircraft folder
    (example: X-Plane 12\Aircraft\ToLissA320_V1p2p1).
 5. Wait for "Done!". Press a key to close the window.
-6. Start X-Plane and load the A320.
+6. Start X-Plane and load the A320 or A321.
 
 Windows might say "Windows protected your PC". Click "More info", then "Run anyway".
 
@@ -75,7 +76,7 @@ then press "Play All".
 
 ADD YOUR OWN SOUNDS
 -------------------
-Put .wav or .mp3 files here (inside your A320 folder):
+Put .wav or .mp3 files here (inside your A320 or A321 folder):
 
   plugins\ToLissFAP\sounds\music            <- boarding music
   plugins\ToLissFAP\sounds\announcements    <- announcements

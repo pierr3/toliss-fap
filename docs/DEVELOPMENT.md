@@ -91,6 +91,16 @@ All names below are `AirbusFBW/...` unless noted.
 - `PaxDoorArray`, `CargoDoorModeArray`, `CargoDoorArray`, `BulkDoor`, `EmerExitArray`
 - Slides: `SlideArmedArray`, `PaxDoorSlidesDeployRatio`, `EmerSlidesDeployRatio`
 - Commands: `toliss_airbus/door_commands/*` (all doors to close/auto/open, arm/disarm slides)
+- The arrays hold door pairs in slot order (1L 1R 2L 2R ...): 4 slots on the A320 and 8 on the A321, where some slots are dummies depending on the exit configuration.
+- A321 exit configuration (`A321ExitConfig`, ToLiss "Cabin Flex"). The plugin only sends the doors and overwing exits that exist (`exit_layout()` in `fap.cpp`):
+
+| Value | Livery setting (`exit_Configuration`) | Doors | Overwing exits per side |
+|---|---|---|---|
+| 0 | `CLASSIC` | 1 2 3 4 | 0 |
+| 1 | `2_OWE` | 1 3 4 | 2 |
+| 2 | `1_OWE` | 1 3 4 | 1 |
+| 3 | `NO_DOOR_3` | 1 4 | 2 |
+
 
 **Cabin:**
 - Lights: `cabinLightLevel_perc`, `CabinLightLevel`

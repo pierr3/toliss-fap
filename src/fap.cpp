@@ -111,6 +111,7 @@ static DR dCargoDoorMode("AirbusFBW/CargoDoorModeArray");
 static DR dBulkDoor("AirbusFBW/BulkDoor");
 static DR dEmerExit("AirbusFBW/EmerExitArray");
 static DR dEmerSlides("AirbusFBW/EmerSlidesDeployRatio");
+static DR dExitCfg("AirbusFBW/A321ExitConfig");
 static DR dCkptDoorLock("AirbusFBW/CockpitDoorLockState");
 static DR dCkptDoorAngle("AirbusFBW/CockpitDoorAngle");
 static DR dCabLightPerc("AirbusFBW/cabinLightLevel_perc");
@@ -152,7 +153,7 @@ static DR* kAllDR[] = {&dPaxDoor, &dPaxDoorMode, &dSlideArmed, &dSlideDeploy, &d
                        &dBulkDoor, &dEmerExit, &dEmerSlides, &dCkptDoorLock, &dCkptDoorAngle, &dCabLightPerc,
                        &dCabLight, &dFSB, &dNS, &dTempCk, &dTempZ1, &dTempZ2, &dSelCk, &dSelFwd, &dSelAft,
                        &dEvacLight, &dEvacBtn, &dEvacSel, &dEmerCallOHP, &dNoPax, &dPaxOxy, &dPhase,
-                       &dCabAlt, &dFus, &dACBus, &dDCBus, &dDoorSwitch};
+                       &dCabAlt, &dFus, &dACBus, &dDCBus, &dDoorSwitch, &dExitCfg};
 
 static void run_command(const char* name) {
     XPLMCommandRef c = XPLMFindCommand(name);
@@ -580,6 +581,35 @@ static void destroy_device() {
 }
 
 // ---------------------------------------------------------------------------
+// Exit layout: which passenger doors and overwing exits exist on this aircraft / configuration.
+// ToLiss door arrays hold door pairs in slot order (1L 1R 2L 2R ...): 4 slots on the A320,
+// 8 on the A321, where some slots are dummies depending on the "Cabin Flex" exit configuration
+// (AirbusFBW/A321ExitConfig, values probed in the sim):
+//   0 CLASSIC    doors 1 2 3 4                       (probed)
+//   1 2_OWE      doors 1 3 4 + 2 overwing exits/side (probed: door 2 slots do not move)
+//   2 1_OWE      doors 1 3 4 + 1 overwing exit/side  (manual order, to be confirmed)
+//   3 NO_DOOR_3  doors 1 4   + 2 overwing exits/side (manual order, to be confirmed)
+// "f" = position along the fuselage drawing (0 nose .. 1 tail).
+struct ExitLayout {
+    std::vector<std::pair<int, float>> doors;  // (door number 1..4, f)
+    std::vector<float> owe;                    // overwing exit pairs (f), fwd first
+    const char* name;
+};
+static ExitLayout exit_layout() {
+    int nd = dPaxDoorMode.size();
+    if (nd <= 4)  // A319 / A320: doors 1 and 2, two overwing exit pairs
+        return {{{1, 0.19f}, {2, 0.885f}}, {0.47f, 0.53f}, "A320"};
+    int cfg = dExitCfg.ok() ? dExitCfg.i(0) : 0;
+    const float d1 = 0.17f, d2 = 0.36f, d3 = 0.62f, d4 = 0.89f, o1 = 0.455f, o2 = 0.515f;
+    switch (cfg) {
+        case 1: return {{{1, d1}, {3, d3}, {4, d4}}, {o1, o2}, "2 OWE + DOOR 3"};
+        case 2: return {{{1, d1}, {3, d3}, {4, d4}}, {0.485f}, "1 OWE + DOOR 3"};
+        case 3: return {{{1, d1}, {4, d4}}, {o1, o2}, "2 OWE, NO DOOR 3"};
+        default: return {{{1, d1}, {2, d2}, {3, d3}, {4, d4}}, {}, "CLASSIC, 4 DOORS"};
+    }
+}
+
+// ---------------------------------------------------------------------------
 // State -> JSON
 static std::string state_json() {
     std::ostringstream o;
@@ -596,14 +626,21 @@ static std::string state_json() {
     if (dIcao.ok()) XPLMGetDatab(dIcao.ref, icao, 0, 7);
     o << ",\"icao\":" << jm::str(icao);
 
-    // doors
+    // doors: only the ones that exist in this exit configuration ("i" = slot in the ToLiss arrays)
+    ExitLayout lay = exit_layout();
     int nd = std::max(0, std::min(8, dPaxDoorMode.size()));
+    o << ",\"exitCfg\":" << (nd > 4 && dExitCfg.ok() ? dExitCfg.i(0) : -1) << ",\"exitName\":" << jm::str(lay.name);
     o << ",\"doors\":[";
-    for (int k = 0; k < nd; ++k) {
-        if (k) o << ",";
-        o << "{\"pos\":" << n(dPaxDoor.at(k)) << ",\"mode\":" << dPaxDoorMode.at(k) << ",\"armed\":"
-          << (int)dSlideArmed.at(k) << ",\"slide\":" << n(dSlideDeploy.at(k)) << "}";
-    }
+    bool first_door = true;
+    for (auto& [num, f] : lay.doors)
+        for (int side = 0; side < 2; ++side) {
+            int k = (num - 1) * 2 + side;
+            if (k >= nd) continue;
+            o << (first_door ? "" : ",") << "{\"i\":" << k << ",\"n\":\"" << num << (side ? "R" : "L") << "\",\"f\":" << n(f, 3)
+              << ",\"pos\":" << n(dPaxDoor.at(k)) << ",\"mode\":" << dPaxDoorMode.at(k) << ",\"armed\":"
+              << (int)dSlideArmed.at(k) << ",\"slide\":" << n(dSlideDeploy.at(k)) << "}";
+            first_door = false;
+        }
     o << "]";
     int nc = std::max(0, std::min(4, dCargoDoorMode.size()));
     o << ",\"cargo\":[";
@@ -613,11 +650,15 @@ static std::string state_json() {
         o << "{\"pos\":" << n(pos) << ",\"mode\":" << dCargoDoorMode.at(k) << "}";
     }
     o << "]";
+    // overwing exits: pairs in EmerExitArray order (fwd L, fwd R, aft L, aft R)
     o << ",\"emer\":[";
-    for (int k = 0; k < 4; ++k) {
-        if (k) o << ",";
-        o << n(std::max(dEmerExit.at(k), dEmerSlides.at(k)));
-    }
+    for (size_t p = 0; p < lay.owe.size(); ++p)
+        for (int side = 0; side < 2; ++side) {
+            int k = (int)p * 2 + side;
+            const char* where = lay.owe.size() == 1 ? "" : p == 0 ? "FWD " : "AFT ";
+            o << (k ? "," : "") << "{\"n\":\"" << where << (side ? "R" : "L") << "\",\"f\":" << n(lay.owe[p], 3)
+              << ",\"v\":" << n(std::max(dEmerExit.at(k), dEmerSlides.at(k))) << "}";
+        }
     o << "]";
     o << ",\"ckptLock\":" << dCkptDoorLock.i() << ",\"ckptDoor\":" << n(dCkptDoorAngle.f());
 

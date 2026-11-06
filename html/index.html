@@ -139,13 +139,20 @@ function detectXP(){
 let S = null, mock = null;
 function mockState(){
   if(!mock) mock = {v:"dev",pwr:1,utc:"12:34",phase:1,gnd:1,toliss:1,icao:"A320",
-    doors:[{pos:1,mode:2,armed:0,slide:0},{pos:0,mode:1,armed:0,slide:0},{pos:0,mode:1,armed:0,slide:0},{pos:0,mode:1,armed:0,slide:0}],
-    cargo:[{pos:1,mode:2},{pos:0.5,mode:2},{pos:0,mode:1}],emer:[0,0,0,0],ckptLock:0,ckptDoor:0,
+    exitCfg:-1,exitName:"A320",
+    doors:[{i:0,n:"1L",f:0.19,pos:1,mode:2,armed:0,slide:0},{i:1,n:"1R",f:0.19,pos:0,mode:1,armed:0,slide:0},{i:2,n:"2L",f:0.885,pos:0,mode:1,armed:0,slide:0},{i:3,n:"2R",f:0.885,pos:0,mode:1,armed:0,slide:0}],
+    cargo:[{pos:1,mode:2},{pos:0.5,mode:2},{pos:0,mode:1}],emer:[{n:"FWD L",f:0.47,v:0},{n:"FWD R",f:0.47,v:0},{n:"AFT L",f:0.53,v:0},{n:"AFT R",f:0.53,v:0}],ckptLock:0,ckptDoor:0,
     light:{perc:100,act:.95},fsb:1,ns:1,temp:{ck:23.1,z1:24.6,z2:25.2,sCk:22,sF:22,sA:23},
     water:86,waste:54,wpre:100,wfill:0,wdrain:0,lav:[{n:"A",occ:1,smoke:0},{n:"D",occ:0,smoke:0},{n:"E",occ:0,smoke:0}],smokeTest:0,
     calls:[{id:2,src:"PAX 14C",txt:"PAX CALL",tm:"12:31",prio:0,act:1},{id:1,src:"CAPT",txt:"CALL FWD ATTND",tm:"12:20",prio:1,act:0}],
     ckptCall:0,cabinReady:0,evac:{light:0,btn:0,sel:0},pax:174,oxy:0,cabAlt:0,bright:.9,debugQuad:1,
     music:{files:["01 Gymnopedie No1 (Satie)","02 Clair de Lune (Debussy)","03 Sonata K545 (Mozart)"],liv:0,idx:0,playing:0,vol:.5},ann:{files:["01 Welcome/English","01 Welcome/French","01 Welcome/Spanish","02 Boarding Completed","03 Cabin Crew Arm Doors","04 Safety Instructions","05 Electronic Devices","06 Fasten Seat Belt","07 Seat Belt Off","08 Turbulence","09 Top of Descent","10 Cabin Crew Seats for Landing","11 After Landing","12 Cabin Crew Disarm Doors","13 Delay","14 De-icing"],idx:-1,playing:0,vol:.9,memo:[3,5,6],queue:0},audioMsg:"",ui:{}};
+  if(location.hash.includes("a321") && mock.icao!=="A321"){   // dev: preview the A321 "2 overwing exits + door 3" layout
+    const D=(n,f,i)=>({i,n,f,pos:0,mode:1,armed:0,slide:0});
+    Object.assign(mock, {icao:"A321", exitCfg:1, exitName:"2 OWE + DOOR 3",
+      doors:[D("1L",.17,0),D("1R",.17,1),D("3L",.62,4),D("3R",.62,5),D("4L",.89,6),D("4R",.89,7)],
+      emer:[{n:"FWD L",f:.455,v:0},{n:"FWD R",f:.455,v:0},{n:"AFT L",f:.515,v:0},{n:"AFT R",f:.515,v:0}]});
+  }
   return mock;
 }
 async function getState(){
@@ -169,7 +176,7 @@ function mockAct(m){
   const s=mockState();
   const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
   switch(m.a){
-    case "door_mode": s.doors[m.i].mode=m.mode; if(m.mode!==1) s.doors[m.i].pos=m.mode===2?1:0; break;
+    case "door_mode": { const d=s.doors.find(x=>x.i===m.i); if(d){ d.mode=m.mode; if(m.mode!==1) d.pos=m.mode===2?1:0; } } break;
     case "cargo_mode": s.cargo[m.i].mode=m.mode; if(m.mode!==1) s.cargo[m.i].pos=m.mode===2?1:0; break;
     case "all_doors": s.doors.forEach(d=>{d.mode=m.mode; if(m.mode!==1) d.pos=m.mode===2?1:0;}); break;
     case "arm_slides": s.doors.forEach(d=>d.armed=d.pos<0.01?1:0); break;
@@ -221,12 +228,11 @@ const key = (label, onclick, cls, attrs) => `<button class="key ${cls||""}" ${at
 const C2F = c => c*9/5+32;
 function tFmt(c, dec){ return ui("tu",0) ? C2F(c).toFixed(dec??1)+"°F" : c.toFixed(dec??1)+"°C"; }
 
-// door naming / layout (A320: 1L 1R 2L 2R + 4 overwing exits; A321: 1L 1R 4L 4R)
-function doorNames(s){
-  const aft = (s.icao||"").startsWith("A321") ? "4" : "2";
-  const base = ["1L","1R",aft+"L",aft+"R"];
-  return s.doors.map((d,i)=> base[i] || ((i%2?"R":"L")+(Math.floor(i/2)+1)));
-}
+// door naming / layout: the plugin sends only the doors and overwing exits that exist on this
+// aircraft and exit configuration (A320, or one of the A321 "Cabin Flex" layouts), with their
+// name (d.n), ToLiss slot (d.i) and position along the fuselage drawing (d.f, 0 nose .. 1 tail)
+function doorNames(s){ return s.doors.map((d,i)=> d.n || ((i%2?"R":"L")+(Math.floor(i/2)+1))); }
+let DOOR_FRAMES = null;      // fuselage door surrounds for the current layout (set in render)
 function doorState(pos){ return pos<0.01 ? "closed" : pos>0.98 ? "open" : "moving"; }
 
 // ================================================================ fuselage drawing
@@ -253,7 +259,7 @@ function fuselage(w, h, opts){
   o += `<path d="M${wx*0.24},${wy+h*0.026} L${wx*0.34},${wy+h*0.012} M${wx*0.76},${wy+h*0.026} L${wx*0.66},${wy+h*0.012}" stroke="#f7f7f7" stroke-width="2.4" stroke-linecap="round"/>`;
   o += `<path d="M${wx*0.40},${wy+h*0.006} L${wx*0.5},${wy+h*0.014} L${wx*0.60},${wy+h*0.006}" fill="none" stroke="#3a3a3a" stroke-width="1.2"/>`;
   // door surrounds: dark bracket notches on both sides
-  if(!opts.noFrames) for(const f of FRAMES){
+  if(!opts.noFrames) for(const f of (DOOR_FRAMES || FRAMES)){
     const y=h*f;
     o += `<path d="M3,${y-9} L-3,${y-9} L-3,${y+9} L3,${y+9}" fill="none" stroke="#1e1e1e" stroke-width="2.2"/>`;
     o += `<path d="M${w-3},${y-9} L${w+3},${y-9} L${w+3},${y+9} L${w-3},${y+9}" fill="none" stroke="#1e1e1e" stroke-width="2.2"/>`;
@@ -327,7 +333,7 @@ function doorMarks(s, W, H, withLabels){
   let o="";
   const ys = [FRAMES[0], FRAMES[0], FRAMES[3], FRAMES[3]];
   s.doors.forEach((d,i)=>{
-    const left = i%2===0, y = H*(ys[i] ?? (0.19 + 0.7*Math.floor(i/2)/Math.max(1,Math.ceil(s.doors.length/2)-1)));
+    const left = d.n ? d.n.endsWith("L") : i%2===0, y = H*(d.f ?? ys[i] ?? 0.5);
     const st = doorState(d.pos);
     const col = d.slide>0.05 ? "#ff3030" : st==="closed" ? "#22d022" : (d.armed ? "#ff3030" : "#f2b100");
     const x = left ? -11 : W+3;
@@ -338,20 +344,16 @@ function doorMarks(s, W, H, withLabels){
       o += `<text x="${tx}" y="${y+6}" font-size="17" fill="#fff" text-anchor="${an}">${names[i]}</text>`;
     }
   });
-  // overwing emergency exits (A320)
-  if(!(s.icao||"").startsWith("A321")){
-    [[FRAMES[1],0],[FRAMES[2],2]].forEach(([f,k])=>{
-      const y=H*f;
-      [[-11,s.emer[k]],[W+3,s.emer[k+1]]].forEach(([x,v])=>{
-        o += `<rect x="${x}" y="${y-8}" width="8" height="16" fill="${(v||0)>0.01?"#f2b100":"#22d022"}" stroke="#222" stroke-width="1"/>`;
-      });
-      if(withLabels){
-        const lab = k===0?"FWD":"AFT";
-        o += `<text x="-16" y="${y+5}" font-size="14" fill="#fff" text-anchor="end">EMER EXIT ${lab} L</text>`;
-        o += `<text x="${W+16}" y="${y+5}" font-size="14" fill="#fff" text-anchor="start">EMER EXIT ${lab} R</text>`;
-      }
-    });
-  }
+  // overwing emergency exits (whatever this layout has: A320 2 pairs, A321 Cabin Flex 0..2 pairs)
+  (s.emer||[]).forEach(e=>{
+    if(typeof e !== "object") return;
+    const y = H*e.f, left = e.n.endsWith("L");
+    o += `<rect x="${left?-11:W+3}" y="${y-8}" width="8" height="16" fill="${(e.v||0)>0.01?"#f2b100":"#22d022"}" stroke="#222" stroke-width="1"/>`;
+    if(withLabels){
+      const lab = `EMER EXIT ${e.n.replace(/\s*[LR]$/,"")}`.trim()+" "+e.n.slice(-1);
+      o += `<text x="${left?-16:W+16}" y="${y+5}" font-size="14" fill="#fff" text-anchor="${left?"end":"start"}">${lab}</text>`;
+    }
+  });
   return o;
 }
 
@@ -460,11 +462,11 @@ PAGES.doors = {
     <div class="grp" style="left:770px;top:0;width:300px"><div class="hd">Door Control</div><div id="dCtl" class="col"></div></div>`,
   update: s => {
     const names = doorNames(s);
-    const sig = s.doors.length+"/"+s.cargo.length;
+    const sig = s.doors.map(d=>d.n).join(",")+"/"+s.cargo.length;
     if(PAGES.doors.sig!==sig){
       PAGES.doors.sig=sig;
       const row = (lab, id, fn) => `<div class="row" style="width:100%;justify-content:space-between"><span style="width:62px;font-size:15px">${lab}</span>${["Close","Auto","Open"].map((t,m)=>`<button class="key" style="min-width:62px;height:44px" id="${id}_${m}" onclick="${fn}(${m})">${t}</button>`).join("")}</div>`;
-      $("dCtl").innerHTML = s.doors.map((d,i)=>row(names[i], "dm"+i, `(m=>act('door_mode',{i:${i},mode:m}))`)).join("")
+      $("dCtl").innerHTML = s.doors.map((d,i)=>row(names[i], "dm"+i, `(m=>act('door_mode',{i:${d.i??i},mode:m}))`)).join("")
         + `<div style="height:6px"></div>` + s.cargo.map((d,i)=>row(["FWD<br>CARGO","AFT<br>CARGO","BULK"][i]||"CARGO", "cm"+i, `(m=>act('cargo_mode',{i:${i},mode:m}))`)).join("");
     }
     s.doors.forEach((d,i)=>[0,1,2].forEach(m=>$(`dm${i}_${m}`).classList.toggle("on", d.mode===m)));
@@ -473,6 +475,7 @@ PAGES.doors = {
     $("dFus").innerHTML = svgWrap(W,H, fuselage(W,H,{noFrames:true}) + doorMarks(s,W,H,true), 170, 10);
     // messages
     const m=[];
+    if(s.exitCfg>=0) m.push(`<span class="w">EXIT CONFIG: ${esc(s.exitName||"")}</span>`);
     s.doors.forEach((d,i)=>{
       if(d.slide>0.05) m.push(`<span class="redt">SLIDE ${names[i]} DEPLOYED</span>`);
       else if(doorState(d.pos)!=="closed") m.push(`DOOR ${names[i]} ${doorState(d.pos)==="open"?"OPEN":"MOVING"}`);
@@ -881,6 +884,8 @@ function renderBoot(s){
 
 function render(){
   const s=S;
+  DOOR_FRAMES = [...new Set([...(s.doors||[]).map(d=>d.f), ...(s.emer||[]).map(e=>e&&e.f)].filter(f=>typeof f==="number"))];
+  if(!DOOR_FRAMES.length) DOOR_FRAMES = null;
   $("off").style.display = s.pwr ? "none" : "block";
   if(!s.pwr){ $("scrOff").style.display = "none"; $("modal").style.display = "none"; }
   // screen brightness: X-Plane does not dim browser screens, so the page dims itself
