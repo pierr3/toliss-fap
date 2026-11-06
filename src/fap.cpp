@@ -370,9 +370,11 @@ static void rescan_audio() {
         S.ann.push_back({livAnn ? "General/" + t.name : t.name, t.path});
 }
 
-// Rescan everything on disk: music, announcements (livery + general) and the chime recordings.
+// Rescan everything on disk: livery content (screen-off image, sounds), general music and
+// announcements, and the chime recordings.
+static void livery_refresh(bool force);
 static void rescan_all() {
-    rescan_audio();
+    livery_refresh(true);   // also rescans the audio lists
     fap_audio::load_chimes(g_plugin_dir + "/sounds/chimes");
     if (S.music_idx >= (int)S.music.size()) S.music_idx = -1;
     S.memo.clear();   // memo entries are indices into the old list
