@@ -65,13 +65,17 @@ The plugin pushes 3D-cockpit touches into the page with `XPLMAvionicsInjectScrip
 | `toliss_fap/key/evac_cmd` | hardware key: EVAC CMD |
 | `toliss_fap/key/evac_reset` | hardware key: EVAC RESET |
 | `toliss_fap/key/smoke_reset` | hardware key: SMOKE RESET |
+| `toliss_fap/key/cover` | open/close the clear cover over the hardware keys |
+| `toliss_fap/keypad/0` ... `9`, `star`, `hash` | flight-deck door keypad: digits build a code, `*` clears it, `#` sends an access request (buzzer in the cockpit) |
 
 ## Datarefs published
 
 | Dataref | Type | Meaning |
 |---|---|---|
-| `toliss_fap/key_light` | float[8] | hardware key indicator bars, lit when the key's function is active (0 = EMER) |
-| `toliss_fap/key_backlight` | float | key legend backlight: 1 whenever any DC bus is powered |
+| `toliss_fap/key_light` | float[8] | key legend light level (0 = EMER, 1..6 = keys): 0.42 backlight with DC power, 1 when the function is active, alerts blink |
+| `toliss_fap/key_backlight` | float | door keypad legend backlight: 1 whenever any DC bus is powered |
+| `toliss_fap/key_cover` | float | key cover position, 0 closed .. 1 open (animated) |
+| `toliss_fap/door_request` | int | 1 for 10 s after an access request from the door keypad |
 | `toliss_fap/hw_lit_off` | float | always 0 (LIT channel for unlit decals) |
 | `toliss_fap/water_pct`, `toliss_fap/waste_pct` | float | simulated tank levels |
 | `toliss_fap/cabin_ready` | int | cabin ready sent |
@@ -113,23 +117,37 @@ All names below are `AirbusFBW/...` unless noted.
 X-Plane only sends mouse clicks to the **cockpit object** (attachment `_obja/0`).
 
 - **Why not a separate object?** Flagging another object as cockpit makes X-Plane ignore it ("two interior cockpit objects").
-- **What gets patched:** the clickable screen (`ATTR_cockpit_device TOLISS_FAP` + `ATTR_manip_device`) and the invisible key click boxes are appended to the user's local cockpit OBJ. The DWSim ATR uses the same approach for its cabin FAP.
+- **What gets patched:** the clickable screen (`ATTR_cockpit_device TOLISS_FAP` + `ATTR_manip_device`) and the invisible click boxes (keys, key cover, door keypad) are appended to the user's local cockpit OBJ. The DWSim ATR uses the same approach for its cabin FAP.
 - **Re-running the installer:** it always starts again from the pristine copy (`*.fap-original`, path recorded in `*.fapinfo`), so the patch never stacks.
 - **ToLiss updates:** when an update installs a fresh OBJ with no FAP block, that fresh OBJ becomes the new original.
+- **Animated click zones:** the installer offsets vertices into the cockpit frame but copies animation lines unchanged, so pivots would be wrong. The key cover therefore uses two static click boxes (closed / open) swapped with `ANIM_hide` on `toliss_fap/key_cover`; only the visual cover in `fap_hw.obj` rotates.
 
 The visible 3D hardware (`fap_hw.obj`) is a normal misc object. The installer adds it to every `.acf` that uses the same cockpit, by cloning the `kitchens.obj` attachment.
 
 ## 3D asset pipeline
 
-Every asset is generated from code, so it can be reviewed and changed in a diff.
+Every asset is generated from code, so it can be reviewed and changed in a diff. Run the steps in this order:
 
-| Script | Output |
-|---|---|
-| `tools/build_fap_hw.py` | `obj/fap_hw.obj`, `obj/fap_screen.obj`, Blender preview meshes (Python 3, no packages) |
-| `tools/gen_hw_tex.ps1` | `obj/fap_hw.png` + `obj/fap_hw_LIT.png` (texture atlas, System.Drawing) |
-| `tools/gen_hw_nml.py` | `obj/fap_hw_NML.png` (normal map) |
-| `tools/gen_screen_off.ps1` | `html/img/screen_off_default.png` |
-| `tools/preview_fap.py` | Blender 4.x headless preview renders (`blender -b --factory-startup -P tools/preview_fap.py -- <out>`) |
+| Step | Script | Output |
+|---|---|---|
+| 1 | `python tools/build_fap_hw.py` | `obj/fap_hw.obj`, `obj/fap_screen.obj`, preview meshes, `build/bake/fap_bake.obj` (Python 3, no packages) |
+| 2 | `python tools/fetch_cc0_textures.py` | CC0 material scans from [ambientCG](https://ambientcg.com) into `build/cc0/` (once) |
+| 3 | `blender -b --factory-startup -P tools/bake_fap_ao.py` | `build/bake/ao.png`: ambient occlusion baked with Cycles |
+| 4 | `python tools/gen_hw_tex.py` | `obj/fap_hw.png`, `_LIT.png`, `_NML.png` (2048², Pillow + numpy) |
+| - | `blender -b --factory-startup -P tools/preview_fap.py -- <abs out dir> [open]` | preview renders (pass an absolute path) |
+| - | `tools/gen_screen_off.ps1` | `html/img/screen_off_default.png` |
+
+Steps 2 and 3 are optional: without them `gen_hw_tex.py` falls back to procedural grain and a blurred-footprint shadow.
+
+**Textures:**
+- **Colours and legends** are our own.
+- **Surface grain** (luminance variation and normals only) comes from the CC0 ambientCG scans Plastic010, Plastic006 and Plastic011. The scans themselves are not committed.
+- **Ambient occlusion** darkens the bezel and keypad faces, and gives the transparent contact-shadow decal on the ToLiss housing.
+
+**Real-panel references:**
+- Every function key glows in its colour whenever there is DC power: LIGHTS in green, the others in red.
+- The clear cover over the keys flips down from a bottom hinge. Set `HINGE = "top"` in `build_fap_hw.py` to make it lift up instead.
+- The door keypad sits at the right edge of the housing.
 
 Geometry is expressed in the ToLiss `kitchens.obj` frame and wrapped in the same `1-sim/fus` fuselage-length animation, so it follows the body length. The installer shifts the screen into the cockpit-object frame using the attachment offsets read from the `.acf`.
 

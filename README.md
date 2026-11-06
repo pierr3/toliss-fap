@@ -38,7 +38,11 @@ It sits on the forward-entry wall behind the cockpit. You can click it in 3D or 
   - Cabin PA is quieter in the cockpit and depends on whether the cockpit door is open.
 - **Realistic power-up:** the keys are backlit as soon as the batteries are on. The screen needs AC power (ground power, APU or engines) and runs a CIDS start-up sequence first.
 - **3D panel hardware**:
-  - Backlit keys with active-state indicators: EMER, LIGHTS MAIN ON/OFF, LAV MAINT, SCREEN LOCK, EVAC CMD/RESET, SMOKE RESET
+  - Metal bezel set into the ToLiss FAP housing, with baked ambient occlusion
+  - Colour-backlit keys (brighter or blinking when active): EMER, LIGHTS MAIN ON/OFF, LAV MAINT, SCREEN LOCK, EVAC CMD/RESET, SMOKE RESET
+  - Clear flip-down cover over the keys: open it before pressing them
+  - USB port
+  - Flight-deck door keypad: enter a code and press # to sound the access buzzer in the cockpit
   - Night lighting matched to the ToLiss cabin
   - Screen brightness follows the ambient light.
 - **Per-livery content:** a livery can bring its own boarding music, announcements and screen-off image.
@@ -106,5 +110,6 @@ Issues and pull requests are welcome. These would help most:
 
 - **Code, UI and 3D model:** [GPL-3.0-or-later](LICENSE).
 - **Shipped audio:** public domain / CC0. Details in [sounds/CREDITS.txt](sounds/CREDITS.txt).
+- **Texture grain:** derived from CC0 material scans by [ambientCG](https://ambientcg.com) (Plastic006, Plastic010, Plastic011).
 - **X-Plane SDK headers and libraries** in `sdk/`: their own permissive license ([sdk/license.txt](sdk/license.txt)).
 - **Trademarks:** ToLiss, Airbus and X-Plane belong to their owners and are used here only to describe compatibility.

@@ -27,6 +27,11 @@ void shutdown();
 
 void play_chime(Chime c);
 
+// Flight-deck door keypad sounds (synthesized): key click beep at the keypad, and the
+// access-request buzzer heard in the cockpit. Played at full level (not the cabin PA gain).
+enum class Beep { Key = 0, DoorBuzzer = 1 };
+void play_beep(Beep b);
+
 // Channel kinds; each kind plays one sound at a time (new one replaces old).
 enum Kind { kMusic = 0, kAnnounce = 1, kKinds = 2 };
 bool play(Kind k, std::shared_ptr<Clip> clip, float volume, bool loop);

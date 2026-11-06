@@ -18,6 +18,7 @@ constexpr int kRate = 44100;
 constexpr double kPi = 3.14159265358979323846;
 
 std::vector<char> g_single, g_hilo, g_hilo3, g_tri, g_lo;
+std::vector<char> g_keybeep, g_buzzer;
 std::shared_ptr<Clip> g_real[5];  // recorded chimes (sounds/chimes/*.wav), preferred over synthesis
 
 struct Slot {
@@ -104,6 +105,26 @@ void build_chimes() {
     b.clear();
     add_tone(b, 0.0, lo, 2.6, 0.6);
     g_lo = to_pcm16(b);
+
+    // keypad key beep: short 2.4 kHz sine, 60 ms with soft edges
+    b.assign((size_t)(0.06 * kRate), 0.f);
+    for (size_t i = 0; i < b.size(); ++i) {
+        double t = (double)i / kRate, env = std::min(1.0, std::min(t, 0.06 - t) / 0.004);
+        b[i] = (float)(std::sin(2 * kPi * 2400 * t) * env * 0.35);
+    }
+    g_keybeep = to_pcm16(b);
+
+    // access-request buzzer: two 0.45 s buzzes of a 400 Hz square-ish wave (odd harmonics)
+    b.assign((size_t)(1.15 * kRate), 0.f);
+    for (int burst = 0; burst < 2; ++burst) {
+        size_t a = (size_t)(burst * 0.65 * kRate), n = (size_t)(0.45 * kRate);
+        for (size_t i = 0; i < n; ++i) {
+            double t = (double)i / kRate, env = std::min(1.0, std::min(t, 0.45 - t) / 0.01), v = 0;
+            for (int h = 1; h <= 9; h += 2) v += std::sin(2 * kPi * 400 * h * t) / h;
+            b[a + i] = (float)(v * env * 0.32);
+        }
+    }
+    g_buzzer = to_pcm16(b);
 }
 
 uint32_t rd32(const unsigned char* p) { return p[0] | (p[1] << 8) | (p[2] << 16) | ((uint32_t)p[3] << 24); }
@@ -196,6 +217,12 @@ void play_chime(Chime c) {
     FMOD_CHANNEL* ch = XPLMPlayPCMOnBus(b.data(), (int)b.size(), FMOD_SOUND_FORMAT_PCM16, kRate, 1, 0,
                                         xplm_AudioInterior, nullptr, nullptr);
     if (ch) XPLMSetAudioVolume(ch, g_master);
+}
+
+void play_beep(Beep which) {
+    std::vector<char>& b = which == Beep::Key ? g_keybeep : g_buzzer;
+    if (b.empty()) return;
+    XPLMPlayPCMOnBus(b.data(), (int)b.size(), FMOD_SOUND_FORMAT_PCM16, kRate, 1, 0, xplm_AudioInterior, nullptr, nullptr);
 }
 
 bool play(Kind k, std::shared_ptr<Clip> clip, float volume, bool loop) {

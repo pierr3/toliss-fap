@@ -42,7 +42,16 @@ The buttons at the bottom of the screen switch pages:
   Smoke Detect . smoke alarms
   ▶ ............ more pages (calls, evacuation, ...)
   Cabin Ready .. tells the pilots the cabin is ready (shows CABIN READY on the ECAM)
+                 (only on the Cabin Status page)
   Screen Off ... turns the screen off
+
+Under the screen there is a row of keys (EMER, LIGHTS, EVAC...).
+They sit behind a clear plastic cover: click the cover to flip it open,
+then click the keys. Click the cover again to close it.
+
+To the right of the screen is the cockpit door keypad.
+Type any code and press # : the door buzzer sounds in the cockpit.
+Press * to clear what you typed.
 
 
 PLAY BOARDING MUSIC

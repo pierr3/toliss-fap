@@ -1076,7 +1076,43 @@ static const char* kKeyCmds[7][2] = {
     {"toliss_fap/key/smoke_reset", "FAP key: SMOKE RESET"},
 };
 static float g_last_light = 100.f;
-static XPLMDataRef r_keylight, r_hwoff, r_backlight;
+static XPLMDataRef r_keylight, r_hwoff, r_backlight, r_cover, r_doorreq;
+
+// Transparent cover over the keys (3D only: while it is closed it takes the clicks).
+// Animated from sim time in the getter, so it moves smoothly at any frame rate.
+static XPLMCommandRef c_cover;
+static bool g_cover_open = false;
+static double g_cover_t0 = -10;               // time of the last toggle
+static constexpr double kCoverSecs = 0.35;
+static float get_cover(void*) {
+    double p = std::clamp((now_s() - g_cover_t0) / kCoverSecs, 0.0, 1.0);
+    p = p * p * (3 - 2 * p);                  // ease in/out
+    return (float)(g_cover_open ? p : 1.0 - p);
+}
+
+// Flight-deck door keypad (own model; ToLiss has no keypad). Digits build a code, * clears it,
+// # sends an access request: the buzzer sounds in the cockpit, as for a routine entry request.
+static const char* kKeypad[12] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "star", "hash"};
+static XPLMCommandRef c_keypad[12];
+static std::string g_code;
+static double g_door_req_until = 0;
+static int keypad_cmd(XPLMCommandRef c, XPLMCommandPhase phase, void*) {
+    if (phase != xplm_CommandBegin || !S.dc_powered) return 0;
+    int k = 0;
+    while (k < 12 && c_keypad[k] != c) ++k;
+    if (k == 12) return 0;
+    fap_audio::play_beep(fap_audio::Beep::Key);
+    if (k < 10) { if (g_code.size() < 8) g_code += kKeypad[k]; }
+    else if (k == 10) g_code.clear();
+    else if (!g_code.empty()) {
+        g_code.clear();
+        g_door_req_until = now_s() + 10.0;
+        fap_audio::play_beep(fap_audio::Beep::DoorBuzzer);
+        logf("cockpit door access request from the keypad");
+    }
+    return 0;
+}
+static int get_doorreq(void*) { return now_s() < g_door_req_until; }
 
 static bool emer_active() {
     if (now_s() < S.ckpt_call_until && S.ckpt_call_until - now_s() > 30.0) return true;  // FAP->cockpit EMER
@@ -1087,6 +1123,13 @@ static bool emer_active() {
 
 static int key_cmd(XPLMCommandRef c, XPLMCommandPhase phase, void*) {
     if (phase != xplm_CommandBegin) return 0;
+    if (c == c_cover) {
+        double p = get_cover(nullptr);        // reverse smoothly if it is still moving
+        g_cover_open = !g_cover_open;
+        double from = g_cover_open ? p : 1.0 - p;
+        g_cover_t0 = now_s() - from * kCoverSecs;
+        return 0;
+    }
     if (c == c_keys[0]) {  // EMER: start an emergency call, or reset an active one
         if (emer_active()) {
             for (auto& e : S.calls)
@@ -1106,6 +1149,9 @@ static int key_cmd(XPLMCommandRef c, XPLMCommandPhase phase, void*) {
 }
 
 // Key legend lighting (index 0 = EMER, 1..6 = keys as in KEYS of build_fap_hw.py).
+// Like the real panel, every key glows in its colour whenever there is DC power (backlight
+// level); a key whose function is active is fully lit, alerts blink between the two.
+static constexpr float kKeyBacklight = 0.42f;
 static int get_keylight(void*, float* out, int offset, int max) {
     const int N = 8;
     if (!out) return N;
@@ -1116,13 +1162,15 @@ static int get_keylight(void*, float* out, int offset, int max) {
         bool evac = dEvacLight.i() || dEvacBtn.i();
         bool smoke = false;
         for (auto& l : S.lav) smoke |= l.smoke;
-        v[0] = emer_active() && blink ? 1.f : 0.f;
-        v[1] = dCabLightPerc.f(0) > 0.5f ? 1.f : 0.f;
-        v[2] = g_lav_maint ? 1.f : 0.f;
-        v[3] = t < g_lock_until ? 1.f : 0.f;
-        v[4] = evac && blink ? 1.f : 0.f;
-        v[5] = evac ? 1.f : 0.f;
-        v[6] = smoke && blink ? 1.f : 0.f;
+        auto lvl = [](bool on) { return on ? 1.f : kKeyBacklight; };
+        v[0] = lvl(emer_active() && blink);
+        v[1] = lvl(dCabLightPerc.f(0) > 0.5f);
+        v[2] = lvl(g_lav_maint);
+        v[3] = lvl(t < g_lock_until);
+        v[4] = lvl(evac && blink);
+        v[5] = lvl(evac);
+        v[6] = lvl(smoke && blink);
+        v[7] = kKeyBacklight;
     }
     int n = 0;
     for (int i = offset; i < N && n < max; ++i) out[n++] = v[i];
@@ -1183,6 +1231,20 @@ PLUGIN_API int XPluginStart(char* outName, char* outSig, char* outDesc) {
         c_keys[i] = XPLMCreateCommand(kKeyCmds[i][0], kKeyCmds[i][1]);
         XPLMRegisterCommandHandler(c_keys[i], key_cmd, 1, nullptr);
     }
+    c_cover = XPLMCreateCommand("toliss_fap/key/cover", "FAP: open/close the clear cover over the keys");
+    XPLMRegisterCommandHandler(c_cover, key_cmd, 1, nullptr);
+    for (int i = 0; i < 12; ++i) {
+        std::string name = std::string("toliss_fap/keypad/") + kKeypad[i];
+        std::string desc = std::string("Cockpit door keypad: ") + (i == 10 ? "*" : i == 11 ? "#" : kKeypad[i]);
+        c_keypad[i] = XPLMCreateCommand(name.c_str(), desc.c_str());
+        XPLMRegisterCommandHandler(c_keypad[i], keypad_cmd, 1, nullptr);
+    }
+    r_cover = XPLMRegisterDataAccessor("toliss_fap/key_cover", xplmType_Float, 0, nullptr, nullptr, get_cover,
+                                       nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                                       nullptr, nullptr, nullptr);
+    r_doorreq = XPLMRegisterDataAccessor("toliss_fap/door_request", xplmType_Int, 0, get_doorreq, nullptr, nullptr,
+                                         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                                         nullptr, nullptr, nullptr);
     r_keylight = XPLMRegisterDataAccessor("toliss_fap/key_light", xplmType_FloatArray, 0, nullptr, nullptr, nullptr,
                                           nullptr, nullptr, nullptr, nullptr, nullptr, get_keylight, nullptr, nullptr,
                                           nullptr, nullptr, nullptr);
@@ -1228,8 +1290,10 @@ PLUGIN_API void XPluginStop(void) {
     if (g_menu_item >= 0) XPLMRemoveMenuItem(XPLMFindPluginsMenu(), g_menu_item);
     g_menu = nullptr;
     g_menu_item = -1;
-    for (auto r : {r_debug, r_water, r_waste, r_ready, r_ckcall, r_keylight, r_hwoff, r_backlight}) XPLMUnregisterDataAccessor(r);
+    for (auto r : {r_debug, r_water, r_waste, r_ready, r_ckcall, r_keylight, r_hwoff, r_backlight, r_cover, r_doorreq}) XPLMUnregisterDataAccessor(r);
     for (int i = 0; i < 7; ++i) XPLMUnregisterCommandHandler(c_keys[i], key_cmd, 1, nullptr);
+    XPLMUnregisterCommandHandler(c_cover, key_cmd, 1, nullptr);
+    for (int i = 0; i < 12; ++i) XPLMUnregisterCommandHandler(c_keypad[i], keypad_cmd, 1, nullptr);
 }
 
 PLUGIN_API int XPluginEnable(void) {
