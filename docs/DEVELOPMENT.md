@@ -4,6 +4,7 @@
 
 ```
 src/            C++ plugin (fap.cpp, audio.cpp, json_mini.h)
+third_party/    minimp3 (CC0 MP3 decoder, header-only)
 html/           the FAP page (index.html) + img/screen_off_default.png
 obj/            fap_hw.obj (+ textures) and fap_screen.obj, both generated
 sounds/         shipped CC0 / public-domain audio (chimes, music)
@@ -21,8 +22,10 @@ docs/           user guide, this file, screenshots
 4. Run `dist\ToLissFAP-<version>\Install FAP.bat`, or install from the command line:
 
 ```
-powershell -ExecutionPolicy Bypass -File dist\ToLissFAP-<ver>\files\Install-FAP.ps1 -Aircraft "<A320 folder>" [-PluginOnly] [-Force]
+powershell -ExecutionPolicy Bypass -File dist\ToLissFAP-<ver>\files\Install-FAP.ps1 [-Aircraft "<A320 or A321 folder>"] [-All] [-PluginOnly] [-Force]
 ```
+
+- Without `-Aircraft`, it searches the usual X-Plane folders for ToLiss aircraft with the FAP housing (`kitchens.obj`). When it finds several, it asks which ones; `-All` installs into all of them without asking.
 
 - `-PluginOnly` only refreshes `plugins\ToLissFAP` (the fast loop while working on code or HTML).
 - `-Force` lets it run while X-Plane is open. A loaded `.xpl` cannot be overwritten, so the installer renames it; reload the aircraft afterwards.
@@ -39,13 +42,19 @@ macOS and Linux builds are not done yet. The code only uses the XPLM API and the
 You can choose the start page with the URL hash:
 - `index.html#audio,noboot` opens the Audio page and skips the boot screen.
 - The page ids are `sts light temp doors water smoke audio calls evac sys cfg caut`.
+- Add `a321` (`#doors,noboot,a321`) to preview the A321 "2 OWE + door 3" layout with the demo data.
 
 Inside X-Plane, the page talks to the plugin through functions registered with `XPLMAvionicsAddBrowserFunction`:
 - `xplane.getState()` is polled every 250 ms and returns a JSON snapshot (see `state_json()` in `fap.cpp`).
 - `xplane.action(json)` sends button presses (see `do_action()`).
 - `xplane.log(text)` writes to X-Plane's `Log.txt`.
 
-The plugin pushes 3D-cockpit touches into the page with `XPLMAvionicsInjectScript` as `fapTouch(x, y)`.
+The plugin pushes 3D-cockpit touches into the page with `XPLMAvionicsInjectScript` as `fapTouch(x, y)`, on mouse-down.
+
+**Performance:**
+- The page re-renders from every poll.
+- Identical `innerHTML` writes are skipped by a guard at the top of the script. Without it, X-Plane re-uploads the screen texture on every repaint, and clicks could land on elements being replaced.
+- Click de-duplication only drops the other source's copy of a click (native vs injected), so fast repeated presses all count.
 
 **Plugins > ToLiss FAP > Reload FAP page** reloads the HTML without restarting the sim.
 
@@ -55,8 +64,8 @@ The plugin pushes 3D-cockpit touches into the page with `XPLMAvionicsInjectScrip
 |---|---|
 | `toliss_fap/toggle_popup` | show/hide the 2D popup |
 | `toliss_fap/pop_out` | pop the FAP out into its own OS window |
-| `toliss_fap/reload` | reload the page and rescan sounds |
-| `toliss_fap/rescan_sounds` | rescan sound folders |
+| `toliss_fap/reload` | reload the page and rescan everything (below) |
+| `toliss_fap/rescan_sounds` | rescan the sound folders, reload the chimes and the current livery's FAP content |
 | `toliss_fap/toggle_debug_quad` | debug screen floating in the cockpit |
 | `toliss_fap/key/emer` | hardware key: EMER call |
 | `toliss_fap/key/lights` | hardware key: LIGHTS MAIN ON/OFF |
@@ -87,7 +96,7 @@ The plugin pushes 3D-cockpit touches into the page with `XPLMAvionicsInjectScrip
 All names below are `AirbusFBW/...` unless noted.
 
 **Doors:**
-- `PaxDoorModeArray` (0 = CLOSE, 1 = AUTO, 2 = OPEN; indices L1, R1, L2, R2)
+- `PaxDoorModeArray` (0 = CLOSE, 1 = AUTO, 2 = OPEN)
 - `PaxDoorArray`, `CargoDoorModeArray`, `CargoDoorArray`, `BulkDoor`, `EmerExitArray`
 - Slides: `SlideArmedArray`, `PaxDoorSlidesDeployRatio`, `EmerSlidesDeployRatio`
 - Commands: `toliss_airbus/door_commands/*` (all doors to close/auto/open, arm/disarm slides)
@@ -162,13 +171,21 @@ Steps 2 and 3 are optional: without them `gen_hw_tex.py` falls back to procedura
 - **Ambient occlusion** darkens the bezel and keypad faces, and gives the transparent contact-shadow decal on the ToLiss housing.
 
 **Real-panel references:**
-- Every function key glows in its colour whenever there is DC power: LIGHTS in green, the others in red.
-- The keys are black and only EMER is red. Their legends are backlit in colour.
+- The keys are black and only EMER is red. Their legends glow in colour whenever there is DC power: LIGHTS in green, the others in red.
 - The clear cover over the keys lifts up from a top hinge (`HINGE` in `build_fap_hw.py`).
-- The door keypad sits on the chamfer along the housing's right edge. It is built flat and then mapped onto that chamfer (`to_chamfer`).
+- The door keypad sits on the flat right side face of the housing, facing the cockpit door. It is built flat and then mapped onto that face (`to_side`).
 - The screen has no dark outline: the glass meets the bezel.
 
-Geometry is expressed in the ToLiss `kitchens.obj` frame and wrapped in the same `1-sim/fus` fuselage-length animation, so it follows the body length. The installer shifts the screen into the cockpit-object frame using the attachment offsets read from the `.acf`.
+Geometry is expressed in the ToLiss `kitchens.obj` frame and wrapped in the same `1-sim/fus` fuselage-length animation, so it follows the body length.
+- **A320 vs A321:** `kitchens.obj` is identical in both.
+- **Click-zone shift:** the installer shifts the screen and the click zones into the cockpit-object frame using the attachment offsets read from the `.acf`. The shift is zero on the A320 and 13.97 ft on the A321, where the cockpit is attached at z = 6.78 ft and `kitchens.obj` at 20.75 ft.
+
+## Release
+
+1. Bump `FAP_VERSION` in `src/fap.cpp`.
+2. Run `build.bat`.
+3. Run `tools\package.ps1`.
+4. Attach `dist\ToLissFAP-<version>.zip` to a GitHub release (`gh release upload v<version> dist\ToLissFAP-<version>.zip --clobber`).
 
 ## Sound format
 

@@ -49,8 +49,13 @@ The buttons at the bottom of the screen switch pages:
 Under the screen there is a row of keys (EMER, LIGHTS, EVAC...).
 They sit behind a clear plastic cover: click the cover to lift it open,
 then click the keys. Click the cover again to close it.
+The keys glow as soon as the aircraft batteries are on.
 
-On the right edge of the panel is the cockpit door keypad.
+A321: the Door/Slides page shows the doors of the exit layout you picked
+in the ISCS (classic 4 doors, or the versions with overwing exits).
+
+Around the right side of the panel (facing the cockpit door) is the
+cockpit door keypad.
 Type any code and press # : it beeps in the cockpit for 5 seconds.
 If the COCKPIT DOOR switch on the pedestal is in NORM, the door then
 unlocks for 5 seconds. If the pilots select LOCK while it beeps, entry is
