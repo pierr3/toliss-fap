@@ -587,8 +587,8 @@ static void destroy_device() {
 // (AirbusFBW/A321ExitConfig, values probed in the sim):
 //   0 CLASSIC    doors 1 2 3 4                       (probed)
 //   1 2_OWE      doors 1 3 4 + 2 overwing exits/side (probed: door 2 slots do not move)
-//   2 1_OWE      doors 1 3 4 + 1 overwing exit/side  (manual order, to be confirmed)
-//   3 NO_DOOR_3  doors 1 4   + 2 overwing exits/side (manual order, to be confirmed)
+//   2 1_OWE      doors 1 3 4 + 1 overwing exit/side  (probed: door 2 slots do not move)
+//   3 NO_DOOR_3  doors 1 4   + 2 overwing exits/side (probed: only door 1 and 4 slots move)
 // "f" = position along the fuselage drawing (0 nose .. 1 tail).
 struct ExitLayout {
     std::vector<std::pair<int, float>> doors;  // (door number 1..4, f)
