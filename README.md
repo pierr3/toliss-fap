@@ -36,8 +36,9 @@ It sits on the forward-entry wall behind the cockpit. You can click it in 3D or 
   - Real A320 chimes: hi, lo, hi-lo and tri-tone
   - Prerecorded announcements in a folder tree, with a MEMO queue, Play Next and Play All
   - Cabin PA is quieter in the cockpit and depends on whether the cockpit door is open.
+- **Realistic power-up:** the keys are backlit as soon as the batteries are on. The screen needs AC power (ground power, APU or engines) and runs a CIDS start-up sequence first.
 - **3D panel hardware**:
-  - Lit keys: EMER, LIGHTS MAIN ON/OFF, LAV MAINT, SCREEN LOCK, EVAC CMD/RESET, SMOKE RESET
+  - Backlit keys with active-state indicators: EMER, LIGHTS MAIN ON/OFF, LAV MAINT, SCREEN LOCK, EVAC CMD/RESET, SMOKE RESET
   - Night lighting matched to the ToLiss cabin
   - Screen brightness follows the ambient light.
 - **Per-livery content:** a livery can bring its own boarding music, announcements and screen-off image.

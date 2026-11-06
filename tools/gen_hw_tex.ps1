@@ -69,18 +69,26 @@ for ($y = 0; $y -lt 384; $y++) { for ($x = 0; $x -lt 1024; $x++) {
     $k = $LITK + 0.35 * (1 - $lum)          # dark parts (caps, strip) keep more of their colour
     $lit.SetPixel($x, $y, [System.Drawing.Color]::FromArgb(255, [int][Math]::Min(255, $c.R * $k), [int][Math]::Min(255, $c.G * $k), [int][Math]::Min(255, $c.B * $k * 0.97)))
 } }
-# ---------------- row 2: EMER legend decal (y 384..512, 256 x 128) ----------------
-Text $g "EMER" (C "#f6f6f6" 235) 0 384 256 128 64
-Fill $l (C "#ff2a14" 255) 24 400 208 96; Glow "EMER" "#ffffff" 0 384 256 128 64     # backlit red when active (kept off the block edges)
-# ---------------- row 3: 8 key legend decals (y 512..640, 128 x 128) ----------------
+# Legends are white and backlit whenever the aircraft has DC power (toliss_fap/key_backlight);
+# the coloured indicator bar above each legend shows the active state (toliss_fap/key_light[i]).
+$LEG = "#eef0f0"; $LEGLIT = "#d2dadf"
+# ---------------- row 2: EMER legend decal (y 394..506, 252 x 112) ----------------
+Text $g "EMER" (C $LEG 240) 0 394 256 112 56
+Glow "EMER" $LEGLIT 0 394 256 112 56
+# ---------------- row 3: 8 key legend decals (y 526..622, 124 x 96) ----------------
 $keys = @("", "LIGHTS`nMAIN`nON/OFF", "LAV`nMAINT", "SCREEN`n30 sec`nLOCK", "EVAC`nCMD", "EVAC`nRESET", "SMOKE`nRESET", "")
-$cols = @("#000000", "#3dff4a", "#ff6a1e", "#ff6a1e", "#ff3a24", "#ff6a1e", "#ff6a1e", "#000000")
 for ($k = 0; $k -lt 8; $k++) {
     if (-not $keys[$k]) { continue }
-    $x = $k * 128; $c = C $cols[$k]
-    $dim = [System.Drawing.Color]::FromArgb(245, [int]($c.R * 0.80 + 35), [int]($c.G * 0.80 + 35), [int]($c.B * 0.80 + 35))
-    Text $g $keys[$k] $dim $x 512 128 128 27
-    Glow $keys[$k] $cols[$k] $x 512 128 128 27
+    $x = $k * 128
+    Text $g $keys[$k] (C $LEG 240) $x 526 128 96 25
+    Glow $keys[$k] $LEGLIT $x 526 128 96 25
+}
+# ---------------- row 5: indicator bars (y 770..798): unlit lens by day, coloured light in LIT ----------------
+$ind = @(@(2, "#26301f", "#3dff4a"), @(130, "#3a2c12", "#ffa21e"), @(258, "#3a1612", "#ff2a14"))
+foreach ($b in $ind) {
+    $x = $b[0]
+    Grad $g (C $b[1]) (C "#141414") $x 770 124 28; Edge $x 770 124 28 "#8a8d90" "#0a0a0a" 2
+    Grad $l (C $b[2]) ([System.Drawing.Color]::FromArgb(255, [int]((C $b[2]).R * 0.7), [int]((C $b[2]).G * 0.7), [int]((C $b[2]).B * 0.7))) $x 770 124 28
 }
 $day.Save((Join-Path $root "obj\fap_hw.png"), [System.Drawing.Imaging.ImageFormat]::Png)
 $lit.Save((Join-Path $root "obj\fap_hw_LIT.png"), [System.Drawing.Imaging.ImageFormat]::Png)

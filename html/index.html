@@ -60,6 +60,17 @@ html,body{width:1100px;height:840px;overflow:hidden;color:var(--white);
 #off{background:#000;z-index:99}
 #scrOff{background:#000 center/cover no-repeat;z-index:95}
 #boot{background:inherit;z-index:96}
+#bootBlk{position:absolute;inset:0;background:#000}
+#bootSplash{position:absolute;inset:0;background:linear-gradient(#0d2a52,#04142c);color:#dfe9f5;flex-direction:column;align-items:center;justify-content:center;gap:10px}
+#bootSplash .lg{font-size:96px;font-weight:700;letter-spacing:14px;color:#fff;text-shadow:0 2px 8px #0008}
+#bootSplash .s1{font-size:24px;letter-spacing:1px}
+#bootSplash .s2{font-size:20px;color:#9fb8d6}
+#bootSplash .s3{position:absolute;bottom:28px;font-size:14px;color:#7f97b5}
+#bootSplash .dots i{display:inline-block;width:10px;height:10px;margin:18px 6px 0;border-radius:50%;background:#9fb8d6;animation:bdot 1.2s infinite}
+#bootSplash .dots i:nth-child(2){animation-delay:.2s}#bootSplash .dots i:nth-child(3){animation-delay:.4s}
+@keyframes bdot{0%,100%{opacity:.2}50%{opacity:1}}
+#boot .st{position:absolute;top:calc(50% + 62px);left:0;right:0;text-align:center;font-size:18px}
+#boot .fl{transition:width .25s linear}
 #boot .bt{position:absolute;top:56px;left:0;right:0;text-align:center;font-size:28px;letter-spacing:1px}
 #boot .bx{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:360px;height:62px;padding:12px;
   background:linear-gradient(#cfcfcf,#9d9d9d);border:2px solid;border-color:#eee #555 #555 #eee;box-shadow:2px 3px 6px #0007}
@@ -95,7 +106,12 @@ svg text{font-family:"Segoe UI",Arial,sans-serif}
 <div id="main"></div>
 <div id="navWrap"><div id="navBar"><i id="navFill"></i></div><div id="nav"></div></div>
 <div id="toast"></div>
-<div class="ovl" id="boot"><div class="bt">CIDS POWER-UP</div><div class="bx"><div class="tr"><div class="fl" id="bootFill"></div></div></div></div>
+<div class="ovl" id="boot">
+  <div id="bootLoad"><div class="bt">CIDS POWER-UP</div><div class="bx"><div class="tr"><div class="fl" id="bootFill"></div></div></div><div class="st" id="bootStep"></div></div>
+  <div id="bootSplash" style="display:none"><div class="lg">CIDS</div><div class="s1">Cabin Intercommunication Data System</div>
+    <div class="s2">Flight Attendant Panel</div><div class="dots"><i></i><i></i><i></i></div><div class="s3" id="bootVer"></div></div>
+  <div id="bootBlk"></div>
+</div>
 <div class="ovl" id="scrOff"></div>
 <div class="ovl" id="lockOv" style="z-index:94;background:#0009;align-items:center;justify-content:center"><div class="msg" style="position:relative;font-size:26px;padding:24px 40px;color:#fff">SCREEN LOCKED &nbsp;<span id="lockS"></span> s</div></div>
 <div class="ovl" id="off"></div>
@@ -127,8 +143,12 @@ function mockState(){
 }
 async function getState(){
   if(detectXP()){ try{ return await xplane.getState(null); }catch(e){ return S; } }
-  return JSON.parse(JSON.stringify(mockState()));
+  const m = JSON.parse(JSON.stringify(mockState()));
+  m.bootDur = 32; m.boot = mockBoot0 < 0 ? -1 : (performance.now() - mockBoot0) / 1000;
+  if(m.boot >= m.bootDur){ m.boot = -1; mockBoot0 = -1; }
+  return m;
 }
+let mockBoot0 = -1;   // demo mode: page load time, so the boot sequence plays (skip with #noboot)
 async function act(a, args){
   const msg = Object.assign({a}, args||{});
   let r;
@@ -167,7 +187,7 @@ function mockAct(m){
     case "memo_del": s.ann.memo.splice(m.p,1); break;
     case "memo_clear": s.ann.memo=[]; break;
     case "memo_next": if(s.ann.memo.length){ s.ann.idx=s.ann.memo.shift(); s.ann.playing=1; setTimeout(()=>s.ann.playing=0,3000);} break;
-    case "memo_all": if(s.ann.memo.length){ s.ann.idx=s.ann.memo[0]; s.ann.playing=1; s.ann.queue=s.ann.memo.length-1; setTimeout(()=>{s.ann.playing=0;s.ann.queue=0;},3000);} break;
+    case "memo_all": if(s.ann.memo.length){ s.ann.idx=s.ann.memo[0]; s.ann.playing=1; s.ann.all=1; s.ann.queue=s.ann.memo.length-1; setTimeout(()=>{s.ann.playing=0;s.ann.queue=0;s.ann.all=0;},3000);} break;
     case "bright": s.bright=m.v; break;
     case "debug_quad": s.debugQuad=m.on?1:0; break;
     case "smoke_test": s.lav.forEach(l=>l.smoke=1); s.smokeTest=1; setTimeout(()=>{s.lav.forEach(l=>l.smoke=0); s.smokeTest=0;},6000); break;
@@ -561,7 +581,7 @@ PAGES.audio = {
       <button class="key sq" style="position:absolute;left:304px;top:256px" onclick="memoDel()">${ARROW_RT}</button>
       <button class="key sq" style="position:absolute;left:24px;top:470px" onclick="act('ann_stop')">Stop</button>
       <button class="key sq" style="position:absolute;left:90px;top:470px" onclick="act('memo_next');memoSel=-1">Play<br>Next</button>
-      <button class="key sq" style="position:absolute;left:156px;top:470px" onclick="act('memo_all')">Play<br>All</button>
+      <button class="key sq" id="memoAllB" style="position:absolute;left:156px;top:470px" onclick="act('memo_all')">Play<br>All</button>
       <div class="lbl" style="left:428px;top:12px;width:214px;font-size:12px">Select</div>
       <div class="lb" id="selList" style="left:428px;top:32px;width:214px;height:${18+SEL_ROWS*24+4}px"></div>
       <button class="key sq" style="position:absolute;left:652px;top:34px;font-size:12px" onclick="selStep(-SEL_ROWS)">Prev<br>Page</button>
@@ -595,6 +615,7 @@ PAGES.audio = {
     $("bgmOn").classList.toggle("on", !!s.music.playing);
     $("bgmOn").onclick = bgmOnOff;
     // on announce + memo
+    $("memoAllB").classList.toggle("on", !!(s.ann.all && s.ann.playing));   // stays green while Play All runs
     $("onAnn").textContent = s.ann.playing ? annLabel(s.ann.idx) + (s.ann.queue? `  (+${s.ann.queue})`:"") : "";
     const memo = s.ann.memo||[];
     if(memoSel>=memo.length) memoSel = memo.length-1;
@@ -798,6 +819,7 @@ function go(k){
   const pg = NAV_PAGES.findIndex(list=>list.some(it=>it && it[0]===k));
   if(pg>=0 && pg!==navPage){ navPage=pg; buildNav(); } else markNav();
   $("kSts").classList.toggle("on", k==="sts");
+  $("kReady").style.display = k==="sts" ? "" : "none";   // CABIN READY only exists on the Cabin Status page
   $("kCfg").classList.toggle("on", k==="cfg");
   if(S) render();
 }
@@ -810,22 +832,40 @@ $("scrOff").onclick = ()=>{ $("scrOff").style.display="none"; };
 let bannerAct=null;
 $("banner").onclick = ()=>{ if(bannerAct) bannerAct(); };
 
-// power-up sequence
-let lastPwr = 0, bootT = 0;
-function boot(){
-  const o=$("boot"), f=$("bootFill"); o.style.display="block"; f.style.width="0";
-  const t0=performance.now(), dur=5000; cancelAnimationFrame(bootT);
-  const step=t=>{ const p=Math.min(1,(t-t0)/dur); f.style.width=(p*100)+"%"; if(p<1) bootT=requestAnimationFrame(step); else o.style.display="none"; };
-  bootT=requestAnimationFrame(step);
+// power-up sequence: the plugin times it (s.boot = seconds since AC power came on, -1 = done)
+// 0..T1 black screen, T1..T2 CIDS splash, T2..end progress bar with the start-up steps
+const BOOT_T1 = 2.5, BOOT_T2 = 8;
+const BOOT_STEPS = ["Self test", "Initialising display", "Connecting to DIRECTOR 1", "Connecting to DIRECTOR 2",
+  "Loading cabin assignment module", "Reading cabin configuration", "Checking cabin components", "Loading audio data",
+  "Starting FAP application"];
+let wasBooting = false;
+function renderBoot(s){
+  const b = s.pwr ? (s.boot ?? -1) : -1, o = $("boot");
+  if(b < 0){
+    o.style.display = "none";
+    if(wasBooting){ wasBooting = false; $("scrOff").style.display = "none"; go("sts"); }
+    return;
+  }
+  wasBooting = true; o.style.display = "block";
+  $("bootBlk").style.display = b < BOOT_T1 ? "block" : "none";
+  $("bootSplash").style.display = b >= BOOT_T1 && b < BOOT_T2 ? "flex" : "none";
+  $("bootVer").textContent = "FAP software " + (s.v || "");
+  if(b >= BOOT_T2){
+    const n = BOOT_STEPS.length, p = Math.min(1, (b - BOOT_T2) / Math.max(1, (s.bootDur || 32) - BOOT_T2 - 0.5));
+    const i = Math.min(n - 1, Math.floor(p * n));
+    // each step fills its share of the bar quickly, then waits: looks like real work being done
+    $("bootFill").style.width = ((i + Math.min(1, (p * n - i) * 1.8)) / n * 100) + "%";
+    $("bootStep").textContent = BOOT_STEPS[i] + "...";
+  } else $("bootFill").style.width = "0";
 }
 
 function render(){
   const s=S;
   $("off").style.display = s.pwr ? "none" : "block";
+  if(!s.pwr){ $("scrOff").style.display = "none"; $("modal").style.display = "none"; }
   // screen brightness: X-Plane does not dim browser screens, so the page dims itself
   $("dimmer").style.opacity = Math.max(0, Math.min(0.94, 1 - (s.effBright ?? s.bright ?? 1)));
-  if(s.pwr && !lastPwr) boot();
-  lastPwr = s.pwr;
+  renderBoot(s);
   $("kReady").classList.toggle("on", !!s.cabinReady);
   if(s.offImg && $("scrOff").dataset.src !== s.offImg){ $("scrOff").dataset.src = s.offImg; $("scrOff").style.backgroundImage = `url("${s.offImg}")`; }
   $("lockOv").style.display = s.lock>0 ? "flex" : "none"; if(s.lock>0) $("lockS").textContent = s.lock;
@@ -864,7 +904,7 @@ window.fapTouch = function(x, y){
 };
 // dev: index.html#temp,noboot opens a page directly and skips the power-up
 const HASH = location.hash.slice(1).split(",");
-if(HASH.includes("noboot")) lastPwr = 1;
+if(!HASH.includes("noboot")) mockBoot0 = performance.now();
 buildNav(); go(PAGES[HASH[0]] ? HASH[0] : "sts"); poll(); setInterval(poll, 250);
 detectXP();
 </script>

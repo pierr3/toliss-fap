@@ -90,8 +90,10 @@ Everything is put back the way it was.
 
 SOMETHING IS WRONG
 ------------------
-- The screen shows a picture or is black: click it to wake it up.
-  Still black? The aircraft needs electrical power (batteries / ground power).
+- The screen is black: like the real one, the FAP needs ground power, the APU
+  generator or the engines running. Batteries alone only light the keys.
+  When power comes on, the FAP takes about 30 seconds to start.
+- The screen shows a picture: it is switched off ("Screen Off"). Click it to wake it up.
 - I can't click the screen: run "Install FAP.bat" again, then reload the aircraft.
 - No sound: check the volume bar on the Audio page, and X-Plane's sound settings.
 - Still broken: open an issue on GitHub and attach X-Plane 12\Log.txt.

@@ -133,7 +133,9 @@ static DR dPhase("AirbusFBW/ECAMFlightPhase");
 static DR dCabAlt("AirbusFBW/CabinAlt");
 static DR dFus("1-sim/fus");
 // X-Plane
-static DR dBusVolts("sim/cockpit2/electrical/bus_volts");
+static DR dACBus("AirbusFBW/ACBusVoltages");   // [0] AC1, [1] AC2 (ext power / APU gen / engine gens)
+static DR dDCBus("AirbusFBW/DCBusVoltages");   // any DC bus (batteries on, or fed through the TRs)
+static DR dBusVolts("sim/cockpit2/electrical/bus_volts");  // fallback when the ToLiss arrays are missing
 static DR dZulu("sim/time/zulu_time_sec");
 static DR dOnGround("sim/flightmodel/failures/onground_any");
 static DR dRunTime("sim/time/total_running_time_sec");
@@ -149,7 +151,7 @@ static DR* kAllDR[] = {&dPaxDoor, &dPaxDoorMode, &dSlideArmed, &dSlideDeploy, &d
                        &dBulkDoor, &dEmerExit, &dEmerSlides, &dCkptDoorLock, &dCkptDoorAngle, &dCabLightPerc,
                        &dCabLight, &dFSB, &dNS, &dTempCk, &dTempZ1, &dTempZ2, &dSelCk, &dSelFwd, &dSelAft,
                        &dEvacLight, &dEvacBtn, &dEvacSel, &dEmerCallOHP, &dNoPax, &dPaxOxy, &dPhase,
-                       &dCabAlt, &dFus};
+                       &dCabAlt, &dFus, &dACBus, &dDCBus};
 
 static void run_command(const char* name) {
     XPLMCommandRef c = XPLMFindCommand(name);
@@ -201,7 +203,9 @@ static struct Sim {
     int prev_emer_call = 0;
     double next_pax_call = 0;
     int debug_quad = 0;
-    bool powered = false;
+    bool powered = false;        // FAP screen + cabin audio: AC power (ext power, APU gen or engine gens)
+    bool dc_powered = false;     // key backlight / CIDS: any DC bus (batteries on)
+    double boot_start = -1;      // sim time the screen started booting, -1 = not booting
     // audio
     std::vector<Track> music, ann;
     int music_idx = -1;
@@ -221,6 +225,11 @@ static double g_lock_until = 0;    // SCREEN 30 sec LOCK key (sim time)
 static double urand() { return std::uniform_real_distribution<double>(0, 1)(g_rng); }
 
 static double now_s() { return dRunTime.f(0); }
+
+static constexpr double kBootSecs = 32.0;     // FAP power-up sequence length (the page draws the stages)
+static constexpr double kHoldUpSecs = 2.0;    // AC breaks shorter than this (power transfers) don't reboot
+static double g_load_t = -1;                  // aircraft load time: power found right after load = no boot
+static double g_ac_lost_at = -1;
 
 static std::string zulu_hhmm() {
     int t = (int)dZulu.f(0);
@@ -565,6 +574,8 @@ static std::string state_json() {
     auto n = [](double v, int p = 2) { return jm::num(v, p); };
     o << "{\"v\":\"" FAP_VERSION "\"";
     o << ",\"pwr\":" << (S.powered ? 1 : 0);
+    o << ",\"boot\":" << (S.powered && S.boot_start >= 0 ? n(now_s() - S.boot_start, 2) : std::string("-1"))
+      << ",\"bootDur\":" << n(kBootSecs, 0);
     o << ",\"utc\":" << jm::str(zulu_hhmm());
     o << ",\"phase\":" << dPhase.i(0);
     o << ",\"gnd\":" << dOnGround.i(1);
@@ -650,7 +661,7 @@ static std::string state_json() {
     o << "],\"idx\":" << S.ann_idx << ",\"playing\":" << (fap_audio::is_playing(fap_audio::kAnnounce) ? 1 : 0)
       << ",\"vol\":" << n(S.ann_vol) << ",\"memo\":[";
     for (size_t k = 0; k < S.memo.size(); ++k) o << (k ? "," : "") << S.memo[k];
-    o << "],\"queue\":" << (S.memo_all ? S.memo.size() : 0) << "}";
+    o << "],\"queue\":" << (S.memo_all ? S.memo.size() : 0) << ",\"all\":" << (S.memo_all ? 1 : 0) << "}";
     o << ",\"audioMsg\":" << jm::str(S.audio_msg);
     o << ",\"livery\":" << jm::str(g_livery_name) << ",\"offImg\":" << jm::str(g_off_img_url);
     o << ",\"ui\":{";
@@ -850,6 +861,44 @@ static float cabin_gain_target() {
     return (float)(cockpit + (1.0 - cockpit) * t);
 }
 
+// Power model:
+//  - key backlight follows the DC buses (batteries on is enough);
+//  - the screen needs AC (AC1 or AC2: external power, APU generator or engine generators),
+//    and boots for kBootSecs every time AC comes back after a real loss.
+static void update_power(double t) {
+    bool ac, dc;
+    if (dACBus.size() >= 2) {
+        ac = std::max(dACBus.at(0), dACBus.at(1)) > 90.f;
+        dc = false;
+        for (int k = 0, n = dDCBus.size(); k < n; ++k) dc |= dDCBus.at(k) > 20.f;
+        dc |= ac;
+    } else {  // not a ToLiss (or datarefs not there yet): X-Plane's buses for both
+        ac = dc = std::max(dBusVolts.at(0), dBusVolts.at(1)) > 20.f;
+    }
+    if (dc != S.dc_powered) logf("DC power %s", dc ? "ON (keys backlit)" : "OFF");
+    S.dc_powered = dc;
+
+    if (ac) {
+        g_ac_lost_at = -1;
+        if (!S.powered) {
+            S.powered = true;
+            bool at_load = g_load_t >= 0 && t - g_load_t < 10.0;  // e.g. loaded with engines running
+            S.boot_start = at_load ? -1 : t;
+            std::string v;
+            for (int k = 0, n = dACBus.size(); k < n; ++k) v += (k ? " " : "") + jm::num(dACBus.at(k), 0);
+            logf("AC power ON (AC buses: %s)%s", v.c_str(), at_load ? ", already on at load: no boot" : ", booting");
+        }
+    } else if (S.powered) {
+        if (g_ac_lost_at < 0) g_ac_lost_at = t;
+        if (t - g_ac_lost_at > kHoldUpSecs) {
+            S.powered = false;
+            S.boot_start = -1;
+            logf("AC power OFF: FAP screen off");
+        }
+    }
+    if (S.boot_start >= 0 && t - S.boot_start >= kBootSecs) S.boot_start = -1;
+}
+
 static float sim_tick(float, float, int, void*) {
     double t = now_s();
     fap_audio::tick(t);
@@ -857,8 +906,7 @@ static float sim_tick(float, float, int, void*) {
     g_last_t = t;
     if (dPaused.i() != 0) dt = 0;
 
-    float v0 = dBusVolts.at(0), v1 = dBusVolts.at(1);
-    S.powered = std::max(v0, v1) > 20.f;
+    update_power(t);
 
     // livery changes (also caught by XPLM_MSG_LIVERY_LOADED; this is a cheap safety net)
     static double next_livery_check = 0;
@@ -1028,7 +1076,7 @@ static const char* kKeyCmds[7][2] = {
     {"toliss_fap/key/smoke_reset", "FAP key: SMOKE RESET"},
 };
 static float g_last_light = 100.f;
-static XPLMDataRef r_keylight, r_hwoff;
+static XPLMDataRef r_keylight, r_hwoff, r_backlight;
 
 static bool emer_active() {
     if (now_s() < S.ckpt_call_until && S.ckpt_call_until - now_s() > 30.0) return true;  // FAP->cockpit EMER
@@ -1062,7 +1110,7 @@ static int get_keylight(void*, float* out, int offset, int max) {
     const int N = 8;
     if (!out) return N;
     float v[N] = {0};
-    if (S.powered) {
+    if (S.dc_powered) {
         double t = now_s();
         bool blink = std::fmod(t, 1.0) < 0.5;
         bool evac = dEvacLight.i() || dEvacBtn.i();
@@ -1081,6 +1129,8 @@ static int get_keylight(void*, float* out, int offset, int max) {
     return n;
 }
 static float get_zero(void*) { return 0.f; }
+// Legend backlight: on whenever the aircraft has DC power, like the real FAP keys.
+static float get_backlight(void*) { return S.dc_powered ? 1.f : 0.f; }
 
 static int get_debug(void*) { return S.debug_quad; }
 static void set_debug(void*, int v) { S.debug_quad = v != 0; }
@@ -1091,6 +1141,7 @@ static int get_ckcall(void*) { return now_s() < S.ckpt_call_until; }
 
 static float deferred_init(float, float, int, void*) {
     for (DR* d : kAllDR) d->reset();
+    g_load_t = now_s();
     install_hooks();
     livery_refresh(true);
     logf("ToLiss datarefs %s; aircraft fus=%d, doors=%d",
@@ -1138,6 +1189,9 @@ PLUGIN_API int XPluginStart(char* outName, char* outSig, char* outDesc) {
     r_hwoff = XPLMRegisterDataAccessor("toliss_fap/hw_lit_off", xplmType_Float, 0, nullptr, nullptr, get_zero,
                                        nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                                        nullptr, nullptr, nullptr);
+    r_backlight = XPLMRegisterDataAccessor("toliss_fap/key_backlight", xplmType_Float, 0, nullptr, nullptr, get_backlight,
+                                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                                           nullptr, nullptr, nullptr);
 
     // Plugins > ToLiss FAP
     g_menu_item = XPLMAppendMenuItem(XPLMFindPluginsMenu(), "ToLiss FAP", nullptr, 0);
@@ -1174,7 +1228,7 @@ PLUGIN_API void XPluginStop(void) {
     if (g_menu_item >= 0) XPLMRemoveMenuItem(XPLMFindPluginsMenu(), g_menu_item);
     g_menu = nullptr;
     g_menu_item = -1;
-    for (auto r : {r_debug, r_water, r_waste, r_ready, r_ckcall, r_keylight, r_hwoff}) XPLMUnregisterDataAccessor(r);
+    for (auto r : {r_debug, r_water, r_waste, r_ready, r_ckcall, r_keylight, r_hwoff, r_backlight}) XPLMUnregisterDataAccessor(r);
     for (int i = 0; i < 7; ++i) XPLMUnregisterCommandHandler(c_keys[i], key_cmd, 1, nullptr);
 }
 
@@ -1197,6 +1251,7 @@ PLUGIN_API void XPluginDisable(void) {
 PLUGIN_API void XPluginReceiveMessage(XPLMPluginID, int msg, void*) {
     if (msg == XPLM_MSG_PLANE_LOADED || msg == XPLM_MSG_AIRPORT_LOADED) {
         for (DR* d : kAllDR) d->reset();
+        g_load_t = now_s();  // a new flight that starts powered (engines running) skips the boot
     }
     if (msg == XPLM_MSG_PLANE_LOADED || msg == XPLM_MSG_LIVERY_LOADED) livery_refresh(true);
 }

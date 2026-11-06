@@ -57,10 +57,15 @@ ATLAS = {  # must match tools/gen_hw_tex.ps1
     "module": (8, 8, 248, 248), "bezel": (264, 8, 504, 248), "dark": (520, 8, 760, 248),
     "strip": (776, 8, 1016, 248), "lip": (4, 260, 252, 380), "frame": (256, 256, 384, 384),
     "cap": (384, 256, 512, 384), "emercap": (512, 256, 640, 384), "usb": (640, 256, 768, 384),
-    "hole": (770, 258, 830, 318), "led": (834, 258, 894, 318), "emerdecal": (0, 384, 256, 512),
+    "hole": (770, 258, 830, 318), "led": (834, 258, 894, 318), "emerdecal": (2, 394, 254, 506),
+    # active-state indicator bars (unlit lens in the day texture, coloured in LIT)
+    "ind_green": (2, 770, 126, 798), "ind_amber": (130, 770, 254, 798), "ind_red": (258, 770, 382, 798),
 }
 for k in range(8):
-    ATLAS[f"key{k}"] = (k * 128 + 2, 514, k * 128 + 126, 638)   # legend decals
+    ATLAS[f"key{k}"] = (k * 128 + 2, 526, k * 128 + 126, 622)   # legend decals (backlit white)
+# indicator colour per light index (0 = EMER)
+IND = {0: "ind_red", 1: "ind_green", 2: "ind_amber", 3: "ind_amber", 4: "ind_red", 5: "ind_amber", 6: "ind_amber"}
+IND_FRAC = 0.24                     # top part of each key cap holding the indicator bar
 
 
 UV_PAD = 10  # px kept clear around every block so filtering at a distance cannot bleed colours
@@ -72,7 +77,7 @@ def uv_rect(name):
         cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
         return ((cx - 3) / TEX, 1 - (cy + 3) / TEX, (cx + 3) / TEX, 1 - (cy - 3) / TEX)
     x0, y0, x1, y1 = ATLAS[name]
-    if not name.startswith("key") and name != "emerdecal":
+    if not name.startswith(("key", "ind_")) and name != "emerdecal":
         cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
         x0, x1 = min(x0 + UV_PAD, cx - 1), max(x1 - UV_PAD, cx + 1)
         y0, y1 = min(y0 + UV_PAD, cy - 1), max(y1 - UV_PAD, cy + 1)
@@ -266,13 +271,17 @@ def build_visual():
         c = (x0 + 0.0022, x1 - 0.0022, y0 + 0.0022, y1 - 0.0022)    # cap base
         m.walls(c, fz, fz + 0.0015, cap_uv + ":s", outward=True)    # short straight skirt
         top = frustum(c, fz + 0.0015, fz + 0.0045, 0.0012, cap_uv)
-        if decal_uv:                                                # legend decal, own backlight
-            m.rect_z(top[0] + 0.0004, top[1] - 0.0004, top[2] + 0.0004, top[3] - 0.0004, fz + 0.0057, decal_uv, light_key)
+        if decal_uv:
+            # lower part: legend, backlit whenever the aircraft has DC power
+            # upper part: indicator bar, lit when the key's function is active
+            ys = top[3] - (top[3] - top[2]) * IND_FRAC
+            m.rect_z(top[0] + 0.0004, top[1] - 0.0004, top[2] + 0.0004, ys, fz + 0.0057, decal_uv, "backlight")
+            m.rect_z(top[0] + 0.0016, top[1] - 0.0016, ys + 0.0003, top[3] - 0.0010, fz + 0.0057, IND[light_key], f"ind{light_key}")
 
     ky = (K[2] + K[3]) / 2 - 0.003
     x = K[0] + 0.012
     emer = (x, x + 0.034, ky - 0.012, ky + 0.012)
-    framed_key(emer, "emercap", "emerdecal", "emer")
+    framed_key(emer, "emercap", "emerdecal", 0)
     x += 0.034 + 0.011
     # indicator LED: octagonal lens in a dark ring
     lx, lr = x + 0.003, 0.0028
@@ -287,7 +296,7 @@ def build_visual():
     FR = 0.024                                                      # key frame size
     for i, (ai, cmd, tip, li) in enumerate(KEYS):
         r = (x + i * KEY_PITCH, x + i * KEY_PITCH + FR, ky - FR / 2, ky + FR / 2)
-        framed_key(r, "cap", f"key{ai}" if li is not None else None, f"key{li}" if li is not None else "cabin")
+        framed_key(r, "cap", f"key{ai}" if li is not None else None, li)
         keyrects.append((r, cmd, tip))
     x += 7 * KEY_PITCH + FR + 0.010
     # USB port: frame + recessed dark socket
@@ -322,12 +331,12 @@ def main():
     # ---- visual OBJ: one TRIS range per light group
     idx, body = [], ANIM[:]
     for key, tris in m.groups:
-        decal = key.startswith("key") or key == "emer"
+        decal = key.startswith("ind") or key == "backlight"
         body.append("ATTR_poly_os 2" if decal else "ATTR_poly_os 0")   # decals drawn on top of their caps
-        if key.startswith("key"):            # legend decals: backlit per key
+        if key.startswith("ind"):            # indicator bars: lit per key when active
             body.append(f"ATTR_light_level 0 1 toliss_fap/key_light[{key[3:]}]")
-        elif key == "emer":
-            body.append("ATTR_light_level 0 1 toliss_fap/key_light[0]")
+        elif key == "backlight":             # legends: backlit whenever there is DC power
+            body.append("ATTR_light_level 0 1 toliss_fap/key_backlight")
         else:                                # body: lit by the ToLiss cabin lighting, like kitchens.obj
             body.append("ATTR_light_level 0 1 anim/cabinLighting 1500")
         body.append(f"TRIS {len(idx)} {len(tris)}")

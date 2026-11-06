@@ -70,7 +70,8 @@ The plugin pushes 3D-cockpit touches into the page with `XPLMAvionicsInjectScrip
 
 | Dataref | Type | Meaning |
 |---|---|---|
-| `toliss_fap/key_light` | float[8] | hardware key backlight (drives the LIT texture) |
+| `toliss_fap/key_light` | float[8] | hardware key indicator bars, lit when the key's function is active (0 = EMER) |
+| `toliss_fap/key_backlight` | float | key legend backlight: 1 whenever any DC bus is powered |
 | `toliss_fap/hw_lit_off` | float | always 0 (LIT channel for unlit decals) |
 | `toliss_fap/water_pct`, `toliss_fap/waste_pct` | float | simulated tank levels |
 | `toliss_fap/cabin_ready` | int | cabin ready sent |
@@ -98,6 +99,10 @@ All names below are `AirbusFBW/...` unless noted.
 
 **Cockpit door:**
 - `CockpitDoorAngle`, `CockpitDoorLockState`, and `ckpt/door` (used to attenuate the PA in the cockpit)
+
+**Power:**
+- `ACBusVoltages` (index 0/1 = AC1/AC2): the screen is on when either is powered, i.e. external power, APU generator or engine generators. It boots for 32 s after every AC loss longer than 2 s (shorter breaks, like a GPU-to-APU transfer, are ignored). Power that is already there when the aircraft loads skips the boot.
+- `DCBusVoltages`: any DC bus powered (batteries on) lights the key legends.
 
 **ECAM:**
 - `ECAMFlightPhase`
