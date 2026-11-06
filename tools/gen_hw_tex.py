@@ -152,7 +152,7 @@ fill("dark", "#1d1f22");     grain("dark", "Plastic011", 0.4, 0.3, 40)
 fill("strip", "#77797d");    grain("strip", "Plastic011", 0.5, 0.4, 60)
 grad("grip", "#a6aaae", "#8a8e93"); grain("grip", "Plastic010", 0.8, 0.5, 130, 0.5)
 grad("frame", "#85888c", "#74777b"); edge("frame", "#b4b7ba", "#3a3c3f", 5); grain("frame", "Plastic010", 0.6, 0.4, 80, 0.3)
-grad("cap", "#6e7175", "#484b4f"); edge("cap", "#9a9da1", "#1d1e20", 7); grain("cap", "Plastic011", 0.5, 0.4, 70, 0.3)
+grad("cap", "#2a2b2e", "#151618"); edge("cap", "#55585c", "#050506", 7); grain("cap", "Plastic011", 0.5, 0.4, 70, 0.3)
 grad("emercap", "#de3127", "#9e140e"); edge("emercap", "#ff9a90", "#4a0805", 7); grain("emercap", "Plastic010", 0.4, 0.4, 110, 0.3)
 fill("usb", "#7d8084"); edge("usb", "#b4b7ba", "#3a3c3f", 4)
 x0, y0, x1, y1 = hw.ATLAS["usb"]
@@ -190,7 +190,7 @@ else:  # fallback: blurred footprint of the bezel + keypad
     m = Image.new("L", (w, h), 0)
     d = ImageDraw.Draw(m)
     sx0, sx1, sy0, sy1 = hw.SH
-    for r in (hw.B, hw.KP):
+    for r in (hw.B,):
         d.rectangle([(r[0] - sx0) / (sx1 - sx0) * w, (sy1 - r[3]) / (sy1 - sy0) * h,
                      (r[1] - sx0) / (sx1 - sx0) * w, (sy1 - r[2]) / (sy1 - sy0) * h], fill=255)
     shadow_a = blur(np.asarray(m, np.float32) / 255, 6) * 0.55
@@ -217,9 +217,10 @@ x0, y0, x1, y1 = px("emerdecal")
 lit[y0:y1, x0:x1] = rgb("#ff2a14") * 0.55
 glow("emerdecal", m, "#ffffff", core=1.0, halo=0.35)
 
-# ---------------------------------------------------------------- key legends: coloured backlit lenses
-# As on the real panel, the function keys glow in their colour whenever the aircraft is powered
-# (LIGHTS green, the others red); toliss_fap/key_light raises them to full brightness when active.
+# ---------------------------------------------------------------- key legends: black keys, coloured backlit text
+# As on the real panel the keys are black (only EMER is red) and their legends glow in colour
+# whenever the aircraft is powered (LIGHTS green, the others red); toliss_fap/key_light raises
+# them to full brightness when the function is active.
 KEYS = ["", "LIGHTS\nMAIN\nON/OFF", "LAV\nMAINT", "SCREEN\n30 sec\nLOCK", "EVAC\nCMD", "EVAC\nRESET", "SMOKE\nRESET", ""]
 COLS = ["", "#a6ff3c", "#ff3a2a", "#ff3a2a", "#ff3a2a", "#ff3a2a", "#ff3a2a", ""]
 for k, txt in enumerate(KEYS):
@@ -227,15 +228,13 @@ for k, txt in enumerate(KEYS):
         continue
     name = f"key{k}"
     c = rgb(COLS[k])
-    lens_top = "#%02x%02x%02x" % tuple(int(v * 255 * 0.42 + 18) for v in c)
-    lens_bot = "#%02x%02x%02x" % tuple(int(v * 255 * 0.30 + 10) for v in c)
-    grad(name, lens_top, lens_bot)
-    edge(name, "#ffffff", "#000000", 3)
+    grad(name, "#1c1d1f", "#101112")
+    edge(name, "#45484c", "#000000", 3)
     m = text_mask(txt, name, 24)
-    over(name, m, "#%02x%02x%02x" % tuple(int(min(255, v * 255 * 0.55 + 95)) for v in c), 0.95)
+    over(name, m, "#%02x%02x%02x" % tuple(int(min(255, v * 255 * 0.45 + 40)) for v in c), 0.95)
     x0, y0, x1, y1 = px(name)
-    lit[y0:y1, x0:x1] = c * 0.62
-    glow(name, m, "#%02x%02x%02x" % tuple(int(min(255, v * 255 * 0.6 + 100)) for v in c), core=1.0, halo=0.4)
+    lit[y0:y1, x0:x1] = c * 0.05
+    glow(name, m, "#%02x%02x%02x" % tuple(int(min(255, v * 255 * 0.85 + 40)) for v in c), core=1.0, halo=0.5)
     spec[y0:y1, x0:x1] = 120
 
 # ---------------------------------------------------------------- keypad digits (dark print, backlit white)

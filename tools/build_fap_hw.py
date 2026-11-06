@@ -39,13 +39,22 @@ ZK = ZB - 0.010                     # key strip plane (keys sit in a well under 
 EDGE_R = 0.003                      # rounded front edge of the bezel
 CORNER_R = 0.010                    # bezel corner radius (in plane)
 
-RIM = 0.005                         # dark rim around the active screen
+RIM = 0.0015                        # thin bezel-coloured lip around the active screen
 S = (SX0 - RIM, SX1 + RIM, SY0 - RIM, SY1 + RIM)            # screen well opening
 K = (SX0 + 0.004, SX1 - 0.004, SY0 - 0.071, SY0 - 0.021)    # key strip opening
 B = (SX0 - 0.022, SX1 + 0.020, K[2] - 0.016, SY1 + 0.022)   # bezel outline
 
-# flight-deck door keypad (right of the bezel, at the housing edge as on the real panel)
-KP = (B[1] + 0.011, B[1] + 0.045, SY0 - 0.015, SY1 - 0.061)
+# flight-deck door keypad: on the chamfer between the housing's front face and its right side
+# (measured from kitchens.obj), facing aft and towards the cockpit door, as on the real panel.
+CH_A = (-0.485, -0.374)             # chamfer edge on the front face (x, z)
+CH_B = (-0.450, -0.401)             # chamfer edge on the side face (x, z)
+_cw = math.hypot(CH_B[0] - CH_A[0], CH_B[1] - CH_A[1])
+CH_U = ((CH_B[0] - CH_A[0]) / _cw, (CH_B[1] - CH_A[1]) / _cw)   # across the chamfer (x, z)
+CH_N = (-CH_U[1], CH_U[0])                                        # outward normal (x, z)
+KP_W, KP_H = 0.034, 0.218
+KP_UC = _cw / 2                     # keypad centred on the chamfer
+KP_YC = (SY0 - 0.015 + SY1 - 0.061) / 2
+KP = (-KP_W / 2, KP_W / 2, KP_YC - KP_H / 2, KP_YC + KP_H / 2)   # keypad rectangle in chamfer-local coords
 D_KP = 0.007
 KP_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "star", "hash"]   # 6 rows x 2
 KP_LABELS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "*", "#"]
@@ -53,7 +62,7 @@ KP_LABELS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "*", "#"]
 # transparent key cover
 CV = (K[0] + 0.0008, K[1] - 0.0008, K[2] + 0.0008, K[3] - 0.0008)
 ZC0, ZC1 = ZB - 0.0022, ZB + 0.0004       # back / front of the sheet
-HINGE = "bottom"                           # "bottom": flips down towards you; "top": lifts up
+HINGE = "top"                              # "top": lifts up (real panel); "bottom": flips down
 COVER_OPEN_DEG = 100
 HINGE_Y = CV[2] if HINGE == "bottom" else CV[3]
 HINGE_Z = (ZC0 + ZC1) / 2
@@ -72,8 +81,8 @@ KEYS = [  # (atlas key index, command, tooltip, light index)
     (7, None, None, None),
 ]
 
-# contact shadow decal on the housing face, around the bezel and keypad
-SH = (B[0] - 0.035, min(KP[1] + 0.006, HOUSING[1] - 0.001), B[2] - 0.030, B[3] + 0.030)
+# contact shadow decal on the housing face, around the bezel
+SH = (B[0] - 0.035, min(B[1] + 0.030, HOUSING[1] - 0.001), B[2] - 0.030, B[3] + 0.030)
 
 # ---------------------------------------------------------------- texture atlas
 # Coordinates are in 1024-units; the textures are TEX_PX square (2x), see tools/gen_hw_tex.py.
@@ -264,6 +273,24 @@ def rect_at_angles(r, angles, cx, cy):
     return out
 
 
+def to_chamfer(mesh):
+    """Map a mesh built in chamfer-local coords (x across the chamfer around the keypad centre,
+    y up, z out of the surface) onto the housing chamfer. A proper rotation: winding is kept."""
+    out = Mesh()
+    for (x, y, z, nx, ny, nz, u, v) in mesh.v:
+        lx = x + KP_UC
+        X = CH_A[0] + lx * CH_U[0] + z * CH_N[0]
+        Z = CH_A[1] + lx * CH_U[1] + z * CH_N[1]
+        out.v.append((X, y, Z, nx * CH_U[0] + nz * CH_N[0], ny, nx * CH_U[1] + nz * CH_N[1], u, v))
+    out.groups = [(k, list(i)) for k, i in mesh.groups]
+    return out
+
+
+def chamfer_pt(x, y, z):
+    lx = x + KP_UC
+    return (CH_A[0] + lx * CH_U[0] + z * CH_N[0], y, CH_A[1] + lx * CH_U[1] + z * CH_N[1])
+
+
 def rot_x(p, deg, py=HINGE_Y, pz=HINGE_Z):
     """Rotate point p about the hinge axis (parallel to x), right-hand rule."""
     a = math.radians(deg)
@@ -279,8 +306,8 @@ def build_bezel(m):
     face.rounded_box(B, CORNER_R, EDGE_R, Z_WALL, ZB, uvf, "bezel:s", key="cabin@bz", holes=[S, K])
     m.merge(face)
     # screen well: walls + dark rim around the active screen
-    m.walls(S, ZS - 0.0005, ZB, "dark:s", outward=False)
-    m.frame(S, [(SX0, SX1, SY0, SY1)], ZS, lambda x, y: uv_rect("dark:s")[:2])
+    m.walls(S, ZS - 0.0005, ZB, "bezel:s", outward=False)
+    m.frame(S, [(SX0, SX1, SY0, SY1)], ZS, lambda x, y: uv_rect("bezel:s")[:2])
     # key strip well + strip plate
     m.walls(K, ZK, ZB, "strip:s", outward=False)
     m.rect_z(K[0], K[1], K[2], K[3], ZK, "strip:s")
@@ -357,19 +384,25 @@ def kp_key_rects():
 
 
 def build_keypad(m):
-    """Flight-deck door keypad: black body with 12 rubber keys and backlit legends.
-    Returns the front-face mesh (bake target) and the click zones."""
-    face = Mesh()
-    face.rounded_box(KP, 0.003, 0.0015, Z_WALL, Z_WALL + D_KP, planar("keypadface", KP), "kpbody:s", key="cabin@kp")
-    m.merge(face)
-    zf = Z_WALL + D_KP
+    """Flight-deck door keypad: black body with 12 rubber keys and backlit legends, built flat
+    in chamfer-local coordinates and mapped onto the housing chamfer.
+    Returns the front-face mesh (bake target, chamfer-mapped) and the click zones (4 corners each)."""
+    face, keys = Mesh(), Mesh()
+    face.rounded_box(KP, 0.003, 0.0015, -0.002, D_KP, planar("keypadface", KP), "kpbody:s", key="cabin@kp")
+    zf = D_KP
     clicks = []
     for i, r in enumerate(kp_key_rects()):
         x0, x1, y0, y1 = r
-        m.walls(r, zf, zf + 0.0025, "kpkey:s", outward=True)
-        m.rect_z(x0, x1, y0, y1, zf + 0.0025, "kpkey:s")
-        m.rect_z(x0 + 0.0008, x1 - 0.0008, y0 + 0.0010, y1 - 0.0010, zf + 0.0027, f"kp{i}", "kpleg")
-        clicks.append((r, f"toliss_fap/keypad/{KP_KEYS[i]}", f"Cockpit door keypad: {KP_LABELS[i]}"))
+        keys.walls(r, zf, zf + 0.0025, "kpkey:s", outward=True)
+        keys.rect_z(x0, x1, y0, y1, zf + 0.0025, "kpkey:s")
+        keys.rect_z(x0 + 0.0008, x1 - 0.0008, y0 + 0.0010, y1 - 0.0010, zf + 0.0027, f"kp{i}", "kpleg")
+        zc = zf + 0.004
+        corners = [chamfer_pt(x0 - 0.001, y0 - 0.001, zc), chamfer_pt(x1 + 0.001, y0 - 0.001, zc),
+                   chamfer_pt(x1 + 0.001, y1 + 0.001, zc), chamfer_pt(x0 - 0.001, y1 + 0.001, zc)]
+        clicks.append((corners, f"toliss_fap/keypad/{KP_KEYS[i]}", f"Cockpit door keypad: {KP_LABELS[i]}"))
+    face = to_chamfer(face)
+    m.merge(face)
+    m.merge(to_chamfer(keys))
     return face, clicks
 
 
@@ -524,10 +557,10 @@ def main():
         pad = 0.002
         q(x0 - pad, x1 + pad, y0 - pad, y1 + pad, ZK + KEY_DEPTH + 0.0015)
         sbody += [f"ATTR_manip_command button {cmd} {tip}", f"TRIS {off} 6"]
-    for (x0, x1, y0, y1), cmd, tip in kp_clicks:       # keypad
+    for corners, cmd, tip in kp_clicks:                # keypad (on the chamfer)
         off = len(si)
-        q(x0 - 0.001, x1 + 0.001, y0 - 0.001, y1 + 0.001, Z_WALL + D_KP + 0.004)
-        sbody += [f"ATTR_manip_command button {cmd} {tip}", f"TRIS {off} 6"]
+        q_pts(corners)
+        sbody += [f"ATTR_manip_command button {cmd} {tip}", f"TRIS {off} 12"]
     # cover, closed: in front of the keys, so it takes the clicks until it is opened
     off = len(si)
     q(CV[0], CV[1], CV[2], CV[3] + 0.002, ZB + 0.0035)
@@ -553,21 +586,28 @@ def main():
     occ_v, occ_t = sub(allm, lambda k: k not in ("cover", "shadow") and "@" not in k)   # minus the bake targets
     cv_v, cv_t = sub(allm, lambda k: k == "cover")
     sh_v, sh_t = sub(allm, lambda k: k == "shadow")
+    # stand-in for the ToLiss housing: front face, right chamfer, right side (from kitchens.obj)
+    h = HOUSING
+    hs = Mesh()
+    hs.quad((h[0], h[2], Z_WALL), (h[1], h[2], Z_WALL), (h[1], h[3], Z_WALL), (h[0], h[3], Z_WALL), (0, 0, 1), (0, 0, 1, 1))
+    hs.quad((CH_A[0], h[2], CH_A[1]), (CH_B[0], h[2], CH_B[1]), (CH_B[0], h[3], CH_B[1]), (CH_A[0], h[3], CH_A[1]),
+            (CH_N[0], 0, CH_N[1]), (0, 0, 1, 1))
+    hs.quad((CH_B[0], h[2], CH_B[1]), (CH_B[0], h[2], -0.473), (CH_B[0], h[3], -0.473), (CH_B[0], h[3], CH_B[1]),
+            (1, 0, 0), (0, 0, 1, 1))
+    wall, wall_t = sub(hs, lambda k: True)
     emit_wavefront(os.path.join(pv, "fap_preview.obj"), "fap_preview.mtl",
                    [("fap_hw", "hw", hw_v, hw_t), ("cover", "cover", cv_v, cv_t), ("shadow", "shadow", sh_v, sh_t),
-                    ("screen", "screen", sv[:4], si[:6])])
+                    ("screen", "screen", sv[:4], si[:6]), ("housing", "housing", wall, wall_t)])
     with open(os.path.join(pv, "fap_preview.mtl"), "w") as f:
         f.write("newmtl hw\nmap_Kd ../../obj/fap_hw.png\nnewmtl cover\nmap_Kd ../../obj/fap_hw.png\n"
-                "newmtl shadow\nmap_Kd ../../obj/fap_hw.png\nnewmtl screen\nmap_Kd screen.png\n")
-    # bake: targets carry atlas UVs; occluders are everything else + the housing face
+                "newmtl shadow\nmap_Kd ../../obj/fap_hw.png\nnewmtl screen\nmap_Kd screen.png\n"
+                "newmtl housing\nKd 0.62 0.62 0.60\n")
+    # bake: targets carry atlas UVs; occluders are everything else + the housing
     bz_v, bz_t = sub(bezel_face, lambda k: True)
     kf_v, kf_t = sub(kp_face, lambda k: True)
-    h = HOUSING
-    wall = [(h[0], h[2], Z_WALL, 0, 0, 1, 0, 0), (h[1], h[2], Z_WALL, 0, 0, 1, 1, 0),
-            (h[1], h[3], Z_WALL, 0, 0, 1, 1, 1), (h[0], h[3], Z_WALL, 0, 0, 1, 0, 1)]
     emit_wavefront(os.path.join(bk, "fap_bake.obj"), "fap_bake.mtl",
                    [("t_bezel", "t", bz_v, bz_t), ("t_keypad", "t", kf_v, kf_t), ("t_shadow", "t", sh_v, sh_t),
-                    ("occ_hw", "o", occ_v, occ_t), ("occ_wall", "o", wall, [0, 2, 1, 0, 3, 2])])
+                    ("occ_hw", "o", occ_v, occ_t), ("occ_wall", "o", wall, wall_t)])
     with open(os.path.join(bk, "fap_bake.mtl"), "w") as f:
         f.write("newmtl t\nnewmtl o\n")
     lay = {"bezel": B, "keypad": KP, "housing": HOUSING, "screen": (SX0, SX1, SY0, SY1), "screen_z": ZS, "wall_z": Z_WALL,

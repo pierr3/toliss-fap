@@ -630,7 +630,7 @@ PAGES.audio = {
           const pad = r.depth*14 + 4;
           const label = r.type==="dir" ? `${annOpen.has(r.path)?"▾":"›"} ${esc(r.name)}` : esc(r.name);
           return `<div class="${cls}" style="padding-left:${pad}px" onclick="rowTap(${k})">${label}</div>`; }).join("")
-      : `<div class="it" style="white-space:normal;height:auto;color:#666;font-size:12px">No announcements.<br>Put .wav files (or folders of<br>them) in sounds/announcements</div>`);
+      : `<div class="it" style="white-space:normal;height:auto;color:#666;font-size:12px">No announcements.<br>Put .wav or .mp3 files (or folders<br>of them) in sounds/announcements</div>`);
     $("aMsg").textContent = s.audioMsg||"";
   }
 };
@@ -639,6 +639,19 @@ const ARROW_D = `<svg width="26" height="22" viewBox="0 0 26 22"><path d="M2,2 L
 const ARROW_LT = `<svg width="30" height="24" viewBox="0 0 30 24"><path d="M2,12 L13,2 L13,8 L28,8 L28,16 L13,16 L13,22 Z" fill="#111"/></svg>`;
 const ARROW_RT = `<svg width="30" height="24" viewBox="0 0 30 24"><path d="M28,12 L17,2 L17,8 L2,8 L2,16 L17,16 L17,22 Z" fill="#111"/></svg>`;
 // --- announcement tree (folders under sounds/announcements) ---
+// Display names only: "08_after_landing" -> "08 After landing"; inside it "after_landing_en" -> "English".
+const LANGS = {en:"English",fr:"French",de:"German",es:"Spanish",it:"Italian",pt:"Portuguese",nl:"Dutch",pl:"Polish",
+  ru:"Russian",tr:"Turkish",ar:"Arabic",zh:"Chinese",ja:"Japanese",ko:"Korean",el:"Greek",sv:"Swedish",da:"Danish",
+  no:"Norwegian",fi:"Finnish",cs:"Czech",hu:"Hungarian",ro:"Romanian",bg:"Bulgarian",hr:"Croatian",he:"Hebrew",hi:"Hindi"};
+function niceName(part, parent){
+  let n = part.replace(/_/g," ").replace(/\s+/g," ").trim();
+  if(parent){
+    const stem = parent.replace(/^\d+[ _-]*/,"").replace(/_/g," ").trim().toLowerCase();
+    if(stem && n.toLowerCase().startsWith(stem)) n = n.slice(stem.length).replace(/^[ _-]+/,"") || n;
+  }
+  if(LANGS[n.toLowerCase()]) return LANGS[n.toLowerCase()];
+  return n.replace(/^(\d+\s+)?([a-z])/, (m,a,b)=>(a||"")+b.toUpperCase());
+}
 const annOpen = new Set();
 function annRows(files){
   // files are "Folder/Sub/Name" paths, sorted; folders appear where their first file does
@@ -648,10 +661,10 @@ function annRows(files){
     let visible = true;
     for(let d=0; d<parts.length-1 && visible; d++){
       const path = parts.slice(0,d+1).join("/");
-      if(!seen.has(path)){ seen.add(path); rows.push({type:"dir", path, name:parts[d], depth:d}); }
+      if(!seen.has(path)){ seen.add(path); rows.push({type:"dir", path, name:niceName(parts[d], d?parts[d-1]:""), depth:d}); }
       visible = annOpen.has(path);
     }
-    if(visible) rows.push({type:"file", i, name:parts[parts.length-1], depth:parts.length-1});
+    if(visible) rows.push({type:"file", i, name:niceName(parts[parts.length-1], parts.length>1?parts[parts.length-2]:""), depth:parts.length-1});
   });
   return rows;
 }
@@ -664,7 +677,7 @@ function openClose(){
   const parent = S.ann.files[r.i].split("/").slice(0,-1).join("/");
   if(parent){ annOpen.delete(parent); annSel = annRows(S.ann.files).findIndex(x=>x.type==="dir"&&x.path===parent); render(); }
 }
-const annLabel = i => (S.ann.files[i]||"?").split("/").join(" › ");
+const annLabel = i => (S.ann.files[i]||"?").split("/").map((x,k,a)=>niceName(x, k?a[k-1]:"")).join(" › ");
 function selStep(d){ const n=annRows(S.ann.files).length; if(!n) return; annSel=Math.max(0,Math.min(n-1,annSel+d)); render(); }
 function memoStep(d){ const n=(S.ann.memo||[]).length; if(!n) return; memoSel = memoSel<0 ? (d>0?0:n-1) : Math.max(0,Math.min(n-1,memoSel+d)); render(); }
 async function memoAdd(){

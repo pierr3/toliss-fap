@@ -131,6 +131,7 @@ static DR dNoPax("AirbusFBW/NoPax");
 static DR dPaxOxy("AirbusFBW/PaxOxyMask");
 static DR dPhase("AirbusFBW/ECAMFlightPhase");
 static DR dCabAlt("AirbusFBW/CabinAlt");
+static DR dDoorSwitch("AirbusFBW/CockpitDoorSwitch");  // pedestal COCKPIT DOOR: 0 UNLOCK, 1 NORM, 2 LOCK
 static DR dFus("1-sim/fus");
 // X-Plane
 static DR dACBus("AirbusFBW/ACBusVoltages");   // [0] AC1, [1] AC2 (ext power / APU gen / engine gens)
@@ -151,7 +152,7 @@ static DR* kAllDR[] = {&dPaxDoor, &dPaxDoorMode, &dSlideArmed, &dSlideDeploy, &d
                        &dBulkDoor, &dEmerExit, &dEmerSlides, &dCkptDoorLock, &dCkptDoorAngle, &dCabLightPerc,
                        &dCabLight, &dFSB, &dNS, &dTempCk, &dTempZ1, &dTempZ2, &dSelCk, &dSelFwd, &dSelAft,
                        &dEvacLight, &dEvacBtn, &dEvacSel, &dEmerCallOHP, &dNoPax, &dPaxOxy, &dPhase,
-                       &dCabAlt, &dFus, &dACBus, &dDCBus};
+                       &dCabAlt, &dFus, &dACBus, &dDCBus, &dDoorSwitch};
 
 static void run_command(const char* name) {
     XPLMCommandRef c = XPLMFindCommand(name);
@@ -311,7 +312,7 @@ static std::vector<Track> scan_wavs(const std::string& dir) {
         if (!it->is_regular_file()) continue;
         std::string ext = it->path().extension().string();
         std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-        if (ext != ".wav") continue;
+        if (ext != ".wav" && ext != ".mp3") continue;
         fs::path rel = fs::relative(it->path(), dir, ec);
         rel.replace_extension();
         v.push_back({rel.generic_string(), it->path().string()});
@@ -367,6 +368,15 @@ static void rescan_audio() {
     // general announcements: grouped under "General" only when the livery brings its own
     for (auto& t : scan_wavs(g_plugin_dir + "/sounds/announcements"))
         S.ann.push_back({livAnn ? "General/" + t.name : t.name, t.path});
+}
+
+// Rescan everything on disk: music, announcements (livery + general) and the chime recordings.
+static void rescan_all() {
+    rescan_audio();
+    fap_audio::load_chimes(g_plugin_dir + "/sounds/chimes");
+    if (S.music_idx >= (int)S.music.size()) S.music_idx = -1;
+    S.memo.clear();   // memo entries are indices into the old list
+    logf("rescan: %d music, %d announcements (wav/mp3), chimes reloaded", (int)S.music.size(), (int)S.ann.size());
 }
 
 // Reads the current livery and (re)loads its FAP content when it changed.
@@ -825,7 +835,7 @@ static std::string do_action(const char* json) {
         S.ann_vol = (float)std::clamp(d("v", 0.9), 0.0, 1.0);
         fap_audio::set_volume(fap_audio::kAnnounce, S.ann_vol);
     } else if (a == "rescan") {
-        rescan_audio();
+        rescan_all();
         S.memo.clear();
         S.ann_queue.clear();
         S.memo_all = false;
@@ -899,6 +909,8 @@ static void update_power(double t) {
     if (S.boot_start >= 0 && t - S.boot_start >= kBootSecs) S.boot_start = -1;
 }
 
+static void door_tick(double t);
+
 static float sim_tick(float, float, int, void*) {
     double t = now_s();
     fap_audio::tick(t);
@@ -907,6 +919,7 @@ static float sim_tick(float, float, int, void*) {
     if (dPaused.i() != 0) dt = 0;
 
     update_power(t);
+    door_tick(t);
 
     // livery changes (also caught by XPLM_MSG_LIVERY_LOADED; this is a cheap safety net)
     static double next_livery_check = 0;
@@ -1057,8 +1070,8 @@ static int own_cmd(XPLMCommandRef c, XPLMCommandPhase phase, void*) {
         if (!XPLMIsAvionicsPopupVisible(g_dev)) XPLMSetAvionicsPopupVisible(g_dev, 1);
         XPLMPopOutAvionics(g_dev);
     }
-    else if (c == c_rescan) rescan_audio();
-    else if (c == c_reload) { rescan_audio(); load_page(); }
+    else if (c == c_rescan) rescan_all();
+    else if (c == c_reload) { rescan_all(); load_page(); }
     else if (c == c_debug) S.debug_quad = !S.debug_quad;
     return 0;
 }
@@ -1091,11 +1104,41 @@ static float get_cover(void*) {
 }
 
 // Flight-deck door keypad (own model; ToLiss has no keypad). Digits build a code, * clears it,
-// # sends an access request: the buzzer sounds in the cockpit, as for a routine entry request.
+// # sends an access request: 5 s of "bip bip bip" in the cockpit, then, if the pedestal COCKPIT
+// DOOR switch is in NORM, the door unlocks for 5 s (the plugin moves the switch to UNLOCK and back,
+// since ToLiss's lock state is read-only). Selecting LOCK during the beeps denies the request.
+// Switch values (probed in the sim): 0 UNLOCK, 1 NORM, 2 LOCK (only 2 sets CockpitDoorLockState).
+static constexpr int kDoorUnlock = 0, kDoorNorm = 1, kDoorLock = 2;
+static constexpr double kDoorBuzzSecs = 5.0, kDoorUnlockSecs = 5.0;
 static const char* kKeypad[12] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "star", "hash"};
 static XPLMCommandRef c_keypad[12];
 static std::string g_code;
-static double g_door_req_until = 0;
+static double g_door_req_until = 0;          // buzzing until (0 = no request)
+static double g_door_unlock_until = 0;       // we hold the switch in UNLOCK until (0 = not us)
+
+static void door_tick(double t) {
+    if (g_door_req_until > 0) {
+        int sw = dDoorSwitch.i(kDoorNorm);
+        if (sw == kDoorLock) {                         // pilot denied entry
+            g_door_req_until = 0;
+            fap_audio::stop_buzzer();
+            logf("cockpit door access denied (switch LOCK)");
+        } else if (t >= g_door_req_until) {
+            g_door_req_until = 0;
+            if (sw == kDoorNorm && dDoorSwitch.ok()) {
+                dDoorSwitch.set((float)kDoorUnlock);
+                g_door_unlock_until = t + kDoorUnlockSecs;
+                logf("cockpit door unlocked after access request (switch NORM)");
+            } else {
+                logf("cockpit door access request: switch %d, no automatic unlock", sw);
+            }
+        }
+    }
+    if (g_door_unlock_until > 0 && t >= g_door_unlock_until) {
+        g_door_unlock_until = 0;
+        if (dDoorSwitch.i(-1) == kDoorUnlock) dDoorSwitch.set((float)kDoorNorm);   // only if nobody moved it
+    }
+}
 static int keypad_cmd(XPLMCommandRef c, XPLMCommandPhase phase, void*) {
     if (phase != xplm_CommandBegin || !S.dc_powered) return 0;
     int k = 0;
@@ -1104,15 +1147,15 @@ static int keypad_cmd(XPLMCommandRef c, XPLMCommandPhase phase, void*) {
     fap_audio::play_beep(fap_audio::Beep::Key);
     if (k < 10) { if (g_code.size() < 8) g_code += kKeypad[k]; }
     else if (k == 10) g_code.clear();
-    else if (!g_code.empty()) {
+    else if (!g_code.empty() && g_door_req_until == 0) {
         g_code.clear();
-        g_door_req_until = now_s() + 10.0;
+        g_door_req_until = now_s() + kDoorBuzzSecs;
         fap_audio::play_beep(fap_audio::Beep::DoorBuzzer);
-        logf("cockpit door access request from the keypad");
+        logf("cockpit door access request from the keypad (door switch %d)", dDoorSwitch.i(-1));
     }
     return 0;
 }
-static int get_doorreq(void*) { return now_s() < g_door_req_until; }
+static int get_doorreq(void*) { return g_door_req_until > 0 ? 1 : 0; }
 
 static bool emer_active() {
     if (now_s() < S.ckpt_call_until && S.ckpt_call_until - now_s() > 30.0) return true;  // FAP->cockpit EMER

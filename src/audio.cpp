@@ -7,6 +7,15 @@
 #include <cstring>
 #include <fstream>
 
+#define MINIMP3_IMPLEMENTATION
+#ifdef _MSC_VER
+#pragma warning(push, 0)
+#endif
+#include "../third_party/minimp3/minimp3_ex.h"  // CC0 MP3 decoder (https://github.com/lieff/minimp3)
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
+
 #include "XPLMSound.h"
 #include "XPLMUtilities.h"
 
@@ -114,14 +123,16 @@ void build_chimes() {
     }
     g_keybeep = to_pcm16(b);
 
-    // access-request buzzer: two 0.45 s buzzes of a 400 Hz square-ish wave (odd harmonics)
-    b.assign((size_t)(1.15 * kRate), 0.f);
-    for (int burst = 0; burst < 2; ++burst) {
-        size_t a = (size_t)(burst * 0.65 * kRate), n = (size_t)(0.45 * kRate);
+    // access-request "bip bip bip" in the cockpit: 5 s of 0.12 s beeps every 0.2 s,
+    // a 1.1 kHz square-ish tone (odd harmonics) so it cuts through the cockpit noise
+    const double period = 0.20, on = 0.12, total = 5.0;
+    b.assign((size_t)(total * kRate), 0.f);
+    for (double t0 = 0; t0 + on <= total; t0 += period) {
+        size_t a = (size_t)(t0 * kRate), n = (size_t)(on * kRate);
         for (size_t i = 0; i < n; ++i) {
-            double t = (double)i / kRate, env = std::min(1.0, std::min(t, 0.45 - t) / 0.01), v = 0;
-            for (int h = 1; h <= 9; h += 2) v += std::sin(2 * kPi * 400 * h * t) / h;
-            b[a + i] = (float)(v * env * 0.32);
+            double t = (double)i / kRate, env = std::min(1.0, std::min(t, on - t) / 0.004), v = 0;
+            for (int h = 1; h <= 7; h += 2) v += std::sin(2 * kPi * 1100 * h * t) / h;
+            b[a + i] = (float)(v * env * 0.30);
         }
     }
     g_buzzer = to_pcm16(b);
@@ -136,8 +147,29 @@ std::shared_ptr<Clip> load_wav(const std::string& path, std::string* err) {
     std::ifstream f(path, std::ios::binary);
     if (!f) { if (err) *err = "cannot open"; return nullptr; }
     std::vector<unsigned char> d((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    if (d.size() >= 4 && memcmp(d.data(), "RIFF", 4) != 0) {
+        // not a WAV: try MP3 (ID3 tag or MPEG frame sync)
+        bool id3 = d.size() > 10 && !memcmp(d.data(), "ID3", 3);
+        bool sync = d.size() > 4 && d[0] == 0xFF && (d[1] & 0xE0) == 0xE0;
+        if (id3 || sync) {
+            mp3dec_t dec;
+            mp3dec_file_info_t info{};
+            if (mp3dec_load_buf(&dec, d.data(), d.size(), &info, nullptr, nullptr) == 0 && info.samples > 0 &&
+                info.channels >= 1 && info.channels <= 2 && info.hz > 0) {
+                auto c = std::make_shared<Clip>();
+                c->rate = info.hz;
+                c->channels = info.channels;
+                c->pcm.assign((const char*)info.buffer, (const char*)(info.buffer + info.samples));
+                free(info.buffer);
+                return c;
+            }
+            free(info.buffer);
+            if (err) *err = "cannot decode MP3";
+            return nullptr;
+        }
+    }
     if (d.size() < 44 || memcmp(d.data(), "RIFF", 4) || memcmp(d.data() + 8, "WAVE", 4)) {
-        if (err) *err = "not a WAV file";
+        if (err) *err = "not a WAV or MP3 file";
         return nullptr;
     }
     int fmt = 0, ch = 0, rate = 0, bits = 0;
@@ -219,10 +251,25 @@ void play_chime(Chime c) {
     if (ch) XPLMSetAudioVolume(ch, g_master);
 }
 
+FMOD_CHANNEL* g_buzzer_ch = nullptr;
+void buzzer_done(void*, FMOD_RESULT) { g_buzzer_ch = nullptr; }
+
 void play_beep(Beep which) {
-    std::vector<char>& b = which == Beep::Key ? g_keybeep : g_buzzer;
-    if (b.empty()) return;
-    XPLMPlayPCMOnBus(b.data(), (int)b.size(), FMOD_SOUND_FORMAT_PCM16, kRate, 1, 0, xplm_AudioInterior, nullptr, nullptr);
+    if (which == Beep::Key) {
+        if (!g_keybeep.empty())
+            XPLMPlayPCMOnBus(g_keybeep.data(), (int)g_keybeep.size(), FMOD_SOUND_FORMAT_PCM16, kRate, 1, 0,
+                             xplm_AudioInterior, nullptr, nullptr);
+        return;
+    }
+    stop_buzzer();
+    if (!g_buzzer.empty())
+        g_buzzer_ch = XPLMPlayPCMOnBus(g_buzzer.data(), (int)g_buzzer.size(), FMOD_SOUND_FORMAT_PCM16, kRate, 1, 0,
+                                       xplm_AudioInterior, buzzer_done, nullptr);
+}
+
+void stop_buzzer() {
+    if (g_buzzer_ch) XPLMStopAudio(g_buzzer_ch);
+    g_buzzer_ch = nullptr;
 }
 
 bool play(Kind k, std::shared_ptr<Clip> clip, float volume, bool loop) {

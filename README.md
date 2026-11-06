@@ -39,10 +39,10 @@ It sits on the forward-entry wall behind the cockpit. You can click it in 3D or 
 - **Realistic power-up:** the keys are backlit as soon as the batteries are on. The screen needs AC power (ground power, APU or engines) and runs a CIDS start-up sequence first.
 - **3D panel hardware**:
   - Metal bezel set into the ToLiss FAP housing, with baked ambient occlusion
-  - Colour-backlit keys (brighter or blinking when active): EMER, LIGHTS MAIN ON/OFF, LAV MAINT, SCREEN LOCK, EVAC CMD/RESET, SMOKE RESET
-  - Clear flip-down cover over the keys: open it before pressing them
+  - Black keys with colour-backlit legends (brighter or blinking when active): EMER, LIGHTS MAIN ON/OFF, LAV MAINT, SCREEN LOCK, EVAC CMD/RESET, SMOKE RESET
+  - Clear lift-up cover over the keys: open it before pressing them
   - USB port
-  - Flight-deck door keypad: enter a code and press # to sound the access buzzer in the cockpit
+  - Flight-deck door keypad on the panel edge: enter a code and press # to make it beep in the cockpit. If the pedestal COCKPIT DOOR switch is in NORM, the door unlocks after 5 s (LOCK denies entry).
   - Night lighting matched to the ToLiss cabin
   - Screen brightness follows the ambient light.
 - **Per-livery content:** a livery can bring its own boarding music, announcements and screen-off image.
@@ -92,7 +92,7 @@ Commands, datarefs, the build and the asset pipeline are covered in [docs/DEVELO
 
 ## Adding sounds
 
-Supported audio is 16-bit PCM `.wav`.
+Supported audio is `.wav` or `.mp3`.
 
 - **Your own sounds:** drop the files into `plugins/ToLissFAP/sounds/music` or `sounds/announcements`.
 - **Per-livery content:** see [LIVERY_FAP.txt](LIVERY_FAP.txt).
@@ -111,5 +111,6 @@ Issues and pull requests are welcome. These would help most:
 - **Code, UI and 3D model:** [GPL-3.0-or-later](LICENSE).
 - **Shipped audio:** public domain / CC0. Details in [sounds/CREDITS.txt](sounds/CREDITS.txt).
 - **Texture grain:** derived from CC0 material scans by [ambientCG](https://ambientcg.com) (Plastic006, Plastic010, Plastic011).
+- **MP3 decoder:** [minimp3](https://github.com/lieff/minimp3), CC0, in `third_party/minimp3`.
 - **X-Plane SDK headers and libraries** in `sdk/`: their own permissive license ([sdk/license.txt](sdk/license.txt)).
 - **Trademarks:** ToLiss, Airbus and X-Plane belong to their owners and are used here only to describe compatibility.

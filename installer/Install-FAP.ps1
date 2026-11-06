@@ -262,8 +262,11 @@ if (Test-Path -LiteralPath $xpl) {
     catch { Rename-Item -LiteralPath $xpl ("ToLissFAP.xpl.old-" + (Stamp)); Say "  (plugin was in use; reload the aircraft)" "Yellow" }
 }
 Get-ChildItem -LiteralPath (Join-Path $plug "win_x64") -Filter "*.old-*" -ErrorAction SilentlyContinue | Remove-Item -ErrorAction SilentlyContinue
-robocopy $srcPlug $plug /E /NFL /NDL /NJH /NJS /NP | Out-Null
+robocopy $srcPlug $plug /E /XD (Join-Path $srcPlug "sounds") /NFL /NDL /NJH /NJS /NP | Out-Null
 if ($LASTEXITCODE -ge 8) { Fail "copying the plugin failed (robocopy $LASTEXITCODE)" }
+# sounds: only add files that are not there yet, so sounds the user replaced or added survive updates
+robocopy (Join-Path $srcPlug "sounds") (Join-Path $plug "sounds") /E /XC /XN /XO /NFL /NDL /NJH /NJS /NP | Out-Null
+if ($LASTEXITCODE -ge 8) { Fail "copying the sounds failed (robocopy $LASTEXITCODE)" }
 if ($ExtraSounds) {
     robocopy $ExtraSounds (Join-Path $plug "sounds") /E /NFL /NDL /NJH /NJS /NP | Out-Null
     if ($LASTEXITCODE -ge 8) { Fail "copying extra sounds failed (robocopy $LASTEXITCODE)" }

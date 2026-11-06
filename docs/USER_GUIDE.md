@@ -46,12 +46,14 @@ The buttons at the bottom of the screen switch pages:
   Screen Off ... turns the screen off
 
 Under the screen there is a row of keys (EMER, LIGHTS, EVAC...).
-They sit behind a clear plastic cover: click the cover to flip it open,
+They sit behind a clear plastic cover: click the cover to lift it open,
 then click the keys. Click the cover again to close it.
 
-To the right of the screen is the cockpit door keypad.
-Type any code and press # : the door buzzer sounds in the cockpit.
-Press * to clear what you typed.
+On the right edge of the panel is the cockpit door keypad.
+Type any code and press # : it beeps in the cockpit for 5 seconds.
+If the COCKPIT DOOR switch on the pedestal is in NORM, the door then
+unlocks for 5 seconds. If the pilots select LOCK while it beeps, entry is
+denied. Press * to clear what you typed.
 
 
 PLAY BOARDING MUSIC
@@ -73,13 +75,22 @@ then press "Play All".
 
 ADD YOUR OWN SOUNDS
 -------------------
-Put .wav files here (inside your A320 folder):
+Put .wav or .mp3 files here (inside your A320 folder):
 
   plugins\ToLissFAP\sounds\music            <- boarding music
   plugins\ToLissFAP\sounds\announcements    <- announcements
 
-Then press "Rescan" on the FAP Config page (or restart).
-Only 16-bit .wav files work. Convert mp3 files with any free audio converter.
+Then press "Rescan" on the FAP Config page
+(or Plugins > ToLiss FAP > Rescan sound files).
+.wav and .mp3 files both work.
+
+One announcement in several languages? Make a folder for it and put one
+file per language inside, ending in the language code, for example:
+  announcements\08_after_landing\after_landing_en.mp3
+  announcements\08_after_landing\after_landing_fr.mp3
+The FAP shows them as "08 After landing" > English / French.
+
+Re-running "Install FAP.bat" never overwrites sounds you added or replaced.
 
 Sounds for one livery only: see LIVERY_FAP.txt in plugins\ToLissFAP.
 

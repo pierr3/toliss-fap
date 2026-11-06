@@ -66,7 +66,7 @@ The plugin pushes 3D-cockpit touches into the page with `XPLMAvionicsInjectScrip
 | `toliss_fap/key/evac_reset` | hardware key: EVAC RESET |
 | `toliss_fap/key/smoke_reset` | hardware key: SMOKE RESET |
 | `toliss_fap/key/cover` | open/close the clear cover over the hardware keys |
-| `toliss_fap/keypad/0` ... `9`, `star`, `hash` | flight-deck door keypad: digits build a code, `*` clears it, `#` sends an access request (buzzer in the cockpit) |
+| `toliss_fap/keypad/0` ... `9`, `star`, `hash` | flight-deck door keypad: digits build a code, `*` clears it, `#` sends an access request (see below) |
 
 ## Datarefs published
 
@@ -75,7 +75,7 @@ The plugin pushes 3D-cockpit touches into the page with `XPLMAvionicsInjectScrip
 | `toliss_fap/key_light` | float[8] | key legend light level (0 = EMER, 1..6 = keys): 0.42 backlight with DC power, 1 when the function is active, alerts blink |
 | `toliss_fap/key_backlight` | float | door keypad legend backlight: 1 whenever any DC bus is powered |
 | `toliss_fap/key_cover` | float | key cover position, 0 closed .. 1 open (animated) |
-| `toliss_fap/door_request` | int | 1 for 10 s after an access request from the door keypad |
+| `toliss_fap/door_request` | int | 1 while a door-keypad access request is beeping in the cockpit |
 | `toliss_fap/hw_lit_off` | float | always 0 (LIT channel for unlit decals) |
 | `toliss_fap/water_pct`, `toliss_fap/waste_pct` | float | simulated tank levels |
 | `toliss_fap/cabin_ready` | int | cabin ready sent |
@@ -107,6 +107,13 @@ All names below are `AirbusFBW/...` unless noted.
 **Power:**
 - `ACBusVoltages` (index 0/1 = AC1/AC2): the screen is on when either is powered, i.e. external power, APU generator or engine generators. It boots for 32 s after every AC loss longer than 2 s (shorter breaks, like a GPU-to-APU transfer, are ignored). Power that is already there when the aircraft loads skips the boot.
 - `DCBusVoltages`: any DC bus powered (batteries on) lights the key legends.
+
+**Cockpit door** (keypad access request):
+- `CockpitDoorSwitch`: pedestal switch, 0 = UNLOCK, 1 = NORM, 2 = LOCK (probed in the sim: only 2 sets `CockpitDoorLockState`, which is read-only).
+- What `#` does:
+  1. It beeps in the cockpit for 5 s.
+  2. If the switch is still in NORM after that, the plugin moves it to UNLOCK for 5 s, then back to NORM. It only moves it back if nobody touched the switch in between.
+  3. If LOCK is selected during the beeps, the request is denied.
 
 **ECAM:**
 - `ECAMFlightPhase`
@@ -146,14 +153,17 @@ Steps 2 and 3 are optional: without them `gen_hw_tex.py` falls back to procedura
 
 **Real-panel references:**
 - Every function key glows in its colour whenever there is DC power: LIGHTS in green, the others in red.
-- The clear cover over the keys flips down from a bottom hinge. Set `HINGE = "top"` in `build_fap_hw.py` to make it lift up instead.
-- The door keypad sits at the right edge of the housing.
+- The keys are black and only EMER is red. Their legends are backlit in colour.
+- The clear cover over the keys lifts up from a top hinge (`HINGE` in `build_fap_hw.py`).
+- The door keypad sits on the chamfer along the housing's right edge. It is built flat and then mapped onto that chamfer (`to_chamfer`).
+- The screen has no dark outline: the glass meets the bezel.
 
 Geometry is expressed in the ToLiss `kitchens.obj` frame and wrapped in the same `1-sim/fus` fuselage-length animation, so it follows the body length. The installer shifts the screen into the cockpit-object frame using the attachment offsets read from the `.acf`.
 
 ## Sound format
 
-- **Format:** 16-bit PCM WAV, mono or stereo, any sample rate.
+- **Format:** WAV (PCM 8/16/24-bit or float) or MP3, mono or stereo, any sample rate. MP3 is decoded with [minimp3](https://github.com/lieff/minimp3) (CC0, vendored in `third_party/minimp3`).
 - **Folders:** each folder under `sounds/announcements` becomes a tree node on the Audio page.
-- **Multi-language announcements:** use `<NN Name>/<Language>.wav` to group languages under one announcement.
+- **Multi-language announcements:** use `<NN Name>/<Language>.wav` to group languages under one announcement. The page also tidies names for display: underscores become spaces, and a file named like its folder plus a language code (`08_after_landing/after_landing_en.mp3`) is shown as the language ("English").
+- **Updates keep user sounds:** the installer only adds sound files that are not there yet.
 - **Shipped audio:** only CC0 or public-domain sounds go into `sounds/`. Never commit audio you cannot redistribute. Personal sound packs belong outside the repo; use `-ExtraSounds` to install them.

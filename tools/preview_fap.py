@@ -3,7 +3,7 @@
 """Blender (4.x) headless preview of the FAP hardware.
 usage: blender -b --factory-startup -P tools/preview_fap.py -- <out_dir>
 Renders a 3/4 view, a straight view and a key-strip close-up, on a plain stand-in for the
-ToLiss housing face. Add "open" after the output dir to render the key cover open."""
+ToLiss housing (front face, right chamfer with the door keypad, right side). Add "open" after the output dir to render the key cover open."""
 import json
 import math
 import os
@@ -23,16 +23,6 @@ bpy.ops.wm.read_factory_settings(use_empty=True)
 # the preview OBJ is already Z-up: keep its axes as written
 bpy.ops.wm.obj_import(filepath=os.path.join(PV, "fap_preview.obj"), forward_axis="Y", up_axis="Z")
 
-# stand-in for the ToLiss housing face (light grey), slightly behind our parts
-h = lay["housing"]
-bpy.ops.mesh.primitive_plane_add(size=1, location=((h[0] + h[1]) / 2, -lay["wall_z"] + 0.0002, (h[2] + h[3]) / 2),
-                                 rotation=(math.radians(90), 0, 0))
-wall = bpy.context.active_object
-wall.scale = (h[1] - h[0], h[3] - h[2], 1)
-wm = bpy.data.materials.new("wall")
-wm.use_nodes = True
-wm.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = (0.62, 0.62, 0.60, 1)
-wall.data.materials.append(wm)
 if OPEN:   # rotate the cover about its hinge (x axis through hinge y/z, kitchens frame -> Blender)
     cov = bpy.data.objects["cover"]
     hy, hz = lay["hinge"]
