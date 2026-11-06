@@ -4,3 +4,4 @@ sounds_local/
 tools_private/
 *.pdb
 *.obj.fapbak-*
+__pycache__/
