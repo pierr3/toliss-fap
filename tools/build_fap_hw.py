@@ -44,17 +44,21 @@ S = (SX0 - RIM, SX1 + RIM, SY0 - RIM, SY1 + RIM)            # screen well openin
 K = (SX0 + 0.004, SX1 - 0.004, SY0 - 0.071, SY0 - 0.021)    # key strip opening
 B = (SX0 - 0.022, SX1 + 0.020, K[2] - 0.016, SY1 + 0.022)   # bezel outline
 
-# flight-deck door keypad: on the chamfer between the housing's front face and its right side
-# (measured from kitchens.obj), facing aft and towards the cockpit door, as on the real panel.
-CH_A = (-0.485, -0.374)             # chamfer edge on the front face (x, z)
-CH_B = (-0.450, -0.401)             # chamfer edge on the side face (x, z)
-_cw = math.hypot(CH_B[0] - CH_A[0], CH_B[1] - CH_A[1])
-CH_U = ((CH_B[0] - CH_A[0]) / _cw, (CH_B[1] - CH_A[1]) / _cw)   # across the chamfer (x, z)
+# housing right edge (measured from kitchens.obj, (x, z)): a chamfer from the front face to the
+# flat right side face, which runs back to the wall
+CHAMFER = ((-0.485, -0.374), (-0.450, -0.401))
+SIDE_BACK_Z = -0.473
+# flight-deck door keypad: on that right side face, facing the cockpit door, as on the real panel.
+# KF_A -> KF_B spans the face it sits on (x, z); the keypad is built flat and mapped onto it.
+KF_A = CHAMFER[1]                   # front edge of the side face
+KF_B = (CHAMFER[1][0], SIDE_BACK_Z) # back edge (at the wall)
+_cw = math.hypot(KF_B[0] - KF_A[0], KF_B[1] - KF_A[1])
+CH_U = ((KF_B[0] - KF_A[0]) / _cw, (KF_B[1] - KF_A[1]) / _cw)   # across the face (x, z)
 CH_N = (-CH_U[1], CH_U[0])                                        # outward normal (x, z)
 KP_W, KP_H = 0.034, 0.218
-KP_UC = _cw / 2                     # keypad centred on the chamfer
+KP_UC = _cw / 2                     # keypad centred on the face
 KP_YC = (SY0 - 0.015 + SY1 - 0.061) / 2
-KP = (-KP_W / 2, KP_W / 2, KP_YC - KP_H / 2, KP_YC + KP_H / 2)   # keypad rectangle in chamfer-local coords
+KP = (-KP_W / 2, KP_W / 2, KP_YC - KP_H / 2, KP_YC + KP_H / 2)   # keypad rectangle in face-local coords
 D_KP = 0.007
 KP_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "star", "hash"]   # 6 rows x 2
 KP_LABELS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "*", "#"]
@@ -273,22 +277,22 @@ def rect_at_angles(r, angles, cx, cy):
     return out
 
 
-def to_chamfer(mesh):
-    """Map a mesh built in chamfer-local coords (x across the chamfer around the keypad centre,
-    y up, z out of the surface) onto the housing chamfer. A proper rotation: winding is kept."""
+def to_side(mesh):
+    """Map a mesh built in face-local coords (x across the face around the keypad centre,
+    y up, z out of the surface) onto the housing side face. A proper rotation: winding is kept."""
     out = Mesh()
     for (x, y, z, nx, ny, nz, u, v) in mesh.v:
         lx = x + KP_UC
-        X = CH_A[0] + lx * CH_U[0] + z * CH_N[0]
-        Z = CH_A[1] + lx * CH_U[1] + z * CH_N[1]
+        X = KF_A[0] + lx * CH_U[0] + z * CH_N[0]
+        Z = KF_A[1] + lx * CH_U[1] + z * CH_N[1]
         out.v.append((X, y, Z, nx * CH_U[0] + nz * CH_N[0], ny, nx * CH_U[1] + nz * CH_N[1], u, v))
     out.groups = [(k, list(i)) for k, i in mesh.groups]
     return out
 
 
-def chamfer_pt(x, y, z):
+def side_pt(x, y, z):
     lx = x + KP_UC
-    return (CH_A[0] + lx * CH_U[0] + z * CH_N[0], y, CH_A[1] + lx * CH_U[1] + z * CH_N[1])
+    return (KF_A[0] + lx * CH_U[0] + z * CH_N[0], y, KF_A[1] + lx * CH_U[1] + z * CH_N[1])
 
 
 def rot_x(p, deg, py=HINGE_Y, pz=HINGE_Z):
@@ -385,8 +389,8 @@ def kp_key_rects():
 
 def build_keypad(m):
     """Flight-deck door keypad: black body with 12 rubber keys and backlit legends, built flat
-    in chamfer-local coordinates and mapped onto the housing chamfer.
-    Returns the front-face mesh (bake target, chamfer-mapped) and the click zones (4 corners each)."""
+    in face-local coordinates and mapped onto the housing side face.
+    Returns the front-face mesh (bake target, mapped onto the side face) and the click zones (4 corners each)."""
     face, keys = Mesh(), Mesh()
     face.rounded_box(KP, 0.003, 0.0015, -0.002, D_KP, planar("keypadface", KP), "kpbody:s", key="cabin@kp")
     zf = D_KP
@@ -397,12 +401,12 @@ def build_keypad(m):
         keys.rect_z(x0, x1, y0, y1, zf + 0.0025, "kpkey:s")
         keys.rect_z(x0 + 0.0008, x1 - 0.0008, y0 + 0.0010, y1 - 0.0010, zf + 0.0027, f"kp{i}", "kpleg")
         zc = zf + 0.004
-        corners = [chamfer_pt(x0 - 0.001, y0 - 0.001, zc), chamfer_pt(x1 + 0.001, y0 - 0.001, zc),
-                   chamfer_pt(x1 + 0.001, y1 + 0.001, zc), chamfer_pt(x0 - 0.001, y1 + 0.001, zc)]
+        corners = [side_pt(x0 - 0.001, y0 - 0.001, zc), side_pt(x1 + 0.001, y0 - 0.001, zc),
+                   side_pt(x1 + 0.001, y1 + 0.001, zc), side_pt(x0 - 0.001, y1 + 0.001, zc)]
         clicks.append((corners, f"toliss_fap/keypad/{KP_KEYS[i]}", f"Cockpit door keypad: {KP_LABELS[i]}"))
-    face = to_chamfer(face)
+    face = to_side(face)
     m.merge(face)
-    m.merge(to_chamfer(keys))
+    m.merge(to_side(keys))
     return face, clicks
 
 
@@ -557,7 +561,7 @@ def main():
         pad = 0.002
         q(x0 - pad, x1 + pad, y0 - pad, y1 + pad, ZK + KEY_DEPTH + 0.0015)
         sbody += [f"ATTR_manip_command button {cmd} {tip}", f"TRIS {off} 6"]
-    for corners, cmd, tip in kp_clicks:                # keypad (on the chamfer)
+    for corners, cmd, tip in kp_clicks:                # keypad (on the housing side face)
         off = len(si)
         q_pts(corners)
         sbody += [f"ATTR_manip_command button {cmd} {tip}", f"TRIS {off} 12"]
@@ -590,10 +594,10 @@ def main():
     h = HOUSING
     hs = Mesh()
     hs.quad((h[0], h[2], Z_WALL), (h[1], h[2], Z_WALL), (h[1], h[3], Z_WALL), (h[0], h[3], Z_WALL), (0, 0, 1), (0, 0, 1, 1))
-    hs.quad((CH_A[0], h[2], CH_A[1]), (CH_B[0], h[2], CH_B[1]), (CH_B[0], h[3], CH_B[1]), (CH_A[0], h[3], CH_A[1]),
-            (CH_N[0], 0, CH_N[1]), (0, 0, 1, 1))
-    hs.quad((CH_B[0], h[2], CH_B[1]), (CH_B[0], h[2], -0.473), (CH_B[0], h[3], -0.473), (CH_B[0], h[3], CH_B[1]),
-            (1, 0, 0), (0, 0, 1, 1))
+    (ax, az), (bx, bz) = CHAMFER
+    cl = math.hypot(bx - ax, bz - az)
+    hs.quad((ax, h[2], az), (bx, h[2], bz), (bx, h[3], bz), (ax, h[3], az), ((az - bz) / cl, 0, (bx - ax) / cl), (0, 0, 1, 1))
+    hs.quad((bx, h[2], bz), (bx, h[2], SIDE_BACK_Z), (bx, h[3], SIDE_BACK_Z), (bx, h[3], bz), (1, 0, 0), (0, 0, 1, 1))
     wall, wall_t = sub(hs, lambda k: True)
     emit_wavefront(os.path.join(pv, "fap_preview.obj"), "fap_preview.mtl",
                    [("fap_hw", "hw", hw_v, hw_t), ("cover", "cover", cv_v, cv_t), ("shadow", "shadow", sh_v, sh_t),

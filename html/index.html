@@ -121,6 +121,13 @@ svg text{font-family:"Segoe UI",Arial,sans-serif}
 
 <script>
 "use strict";
+// Performance: the state is polled 4x a second and pages re-render from it. Skip innerHTML
+// writes that would not change anything, so idle polls cause no relayout/repaint (X-Plane re-uploads
+// the screen texture on every repaint) and clicks never land on an element being replaced.
+(()=>{ const d = Object.getOwnPropertyDescriptor(Element.prototype, "innerHTML");
+  Object.defineProperty(Element.prototype, "innerHTML", {configurable:true, enumerable:d.enumerable,
+    get(){ return d.get.call(this); },
+    set(v){ v = String(v); if(this.__fapHtml === v) return; this.__fapHtml = v; d.set.call(this, v); } }); })();
 // ================================================================ bridge
 // X-Plane attaches window.xplane to the page; it may appear after our script first runs, so detect lazily.
 let HAS_XP = false, xpAnnounced = false;
@@ -899,13 +906,17 @@ async function poll(){
   finally{ polling=false; }
 }
 // Touch input from the plugin (3D cockpit clicks) + de-duplication against native clicks.
-let lastClk = {t:0, x:-99, y:-99};
+// A 3D click can reach the page twice: injected by the plugin (isTrusted=false) and natively
+// (isTrusted=true). Only a click from the OTHER source at the same spot shortly after is dropped,
+// so quick repeated presses (scrolling a list with the arrows) all go through.
+const lastClk = {true:{t:-1e9,x:-99,y:-99}, false:{t:-1e9,x:-99,y:-99}};
 document.addEventListener("click", e => {
-  const now = performance.now();
-  if(now - lastClk.t < 350 && Math.abs(e.clientX-lastClk.x) < 14 && Math.abs(e.clientY-lastClk.y) < 14){
+  const now = performance.now(), src = !!e.isTrusted, o = lastClk[!src];
+  if(now - o.t < 300 && Math.abs(e.clientX-o.x) < 14 && Math.abs(e.clientY-o.y) < 14){
+    o.t = -1e9;   // consume the pair
     e.stopImmediatePropagation(); e.preventDefault(); return;
   }
-  lastClk = {t:now, x:e.clientX, y:e.clientY};
+  lastClk[src] = {t:now, x:e.clientX, y:e.clientY};
 }, true);
 window.fapTouch = function(x, y){
   const el = document.elementFromPoint(x, y);

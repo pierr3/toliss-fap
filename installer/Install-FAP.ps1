@@ -1,6 +1,6 @@
 # ToLiss FAP installer / uninstaller  (Windows PowerShell 5.1+, no other dependency)
 #
-# Installs the Flight Attendant Panel into a ToLiss A320 aircraft folder:
+# Installs the Flight Attendant Panel into a ToLiss A320 / A321 aircraft folder:
 #   1. copies the plugin to   <aircraft>\plugins\ToLissFAP
 #   2. copies the 3D panel to <aircraft>\objects\ToLissFAP
 #   3. adds the clickable FAP screen to YOUR local cockpit OBJ (in X-Plane only the
@@ -8,7 +8,9 @@
 #   4. attaches the 3D panel in every .acf that uses that cockpit (backup written first).
 # No ToLiss file is shipped: your own files are patched in place, always with backups.
 #
-# Usage: Install-FAP.ps1 [-Aircraft <folder>] [-Uninstall] [-PluginOnly] [-ExtraSounds <dir>] [-Force]
+# Usage: Install-FAP.ps1 [-Aircraft <folder>] [-All] [-Uninstall] [-PluginOnly] [-ExtraSounds <dir>] [-Force]
+# Without -Aircraft it looks for every ToLiss A320/A321 in the usual X-Plane folders and, when
+# there are several, asks which ones (or takes them all with -All).
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 pierr3 and ToLiss FAP contributors
@@ -17,7 +19,8 @@ param(
     [switch]$Uninstall,
     [switch]$PluginOnly,       # only refresh the plugin folder (no OBJ / acf changes)
     [string]$ExtraSounds,      # optional folder merged into plugins\ToLissFAP\sounds
-    [switch]$Force             # do not refuse while X-Plane is running
+    [switch]$Force,            # do not refuse while X-Plane is running
+    [switch]$All               # several aircraft found: install into all of them without asking
 )
 $ErrorActionPreference = "Stop"
 $here = $PSScriptRoot
@@ -51,16 +54,45 @@ if (-not $Aircraft) {
         $acDir = Join-Path $xp "Aircraft"
         if (Test-Path -LiteralPath $acDir) {
             $guess += Get-ChildItem -LiteralPath $acDir -Directory -Recurse -Depth 1 -ErrorAction SilentlyContinue |
-                Where-Object { $_.Name -like "ToLissA320*" -and (Test-Aircraft $_.FullName) }
+                Where-Object { $_.Name -like "ToLiss*" -and (Test-Aircraft $_.FullName) }
         }
     }
-    if (@($guess).Count -eq 1) {
+    $guess = @($guess | Sort-Object FullName -Unique)
+    if ($guess.Count -eq 1) {
         $Aircraft = $guess[0].FullName
-        Say "Found ToLiss A320: $Aircraft" "Cyan"
+        Say "Found ToLiss aircraft: $Aircraft" "Cyan"
+    } elseif ($guess.Count -gt 1) {
+        Say "Found these ToLiss aircraft:" "Cyan"
+        for ($i = 0; $i -lt $guess.Count; $i++) { Say ("  {0}) {1}" -f ($i + 1), $guess[$i].FullName) }
+        $pick = @()
+        if ($All) { $pick = $guess } else {
+            $ans = Read-Host "Install into which? Press Enter for all, or type numbers (e.g. 1 or 1,2)"
+            if (-not $ans.Trim()) { $pick = $guess }
+            else {
+                foreach ($n in ($ans -split "[,; ]+" | Where-Object { $_ })) {
+                    $k = 0
+                    if ([int]::TryParse($n, [ref]$k) -and $k -ge 1 -and $k -le $guess.Count) { $pick += $guess[$k - 1] }
+                }
+            }
+        }
+        if (-not $pick) { Fail "Nothing selected." }
+        # run once per aircraft, passing the other options through
+        $fwd = @{}
+        if ($Uninstall) { $fwd["Uninstall"] = $true }
+        if ($PluginOnly) { $fwd["PluginOnly"] = $true }
+        if ($Force) { $fwd["Force"] = $true }
+        if ($ExtraSounds) { $fwd["ExtraSounds"] = $ExtraSounds }
+        $bad = 0
+        foreach ($g in $pick) {
+            Say ""
+            & $PSCommandPath -Aircraft $g.FullName @fwd
+            if ($LASTEXITCODE -ne 0) { $bad++ }
+        }
+        exit $bad
     } else {
         Add-Type -AssemblyName System.Windows.Forms
         $dlg = New-Object System.Windows.Forms.FolderBrowserDialog
-        $dlg.Description = "Select your ToLiss A320 folder (the one that contains a320.acf)"
+        $dlg.Description = "Select your ToLiss A320 or A321 folder (the one that contains the .acf files)"
         $dlg.ShowNewFolderButton = $false
         if ($dlg.ShowDialog() -ne "OK") { Fail "No folder selected." }
         $Aircraft = $dlg.SelectedPath
@@ -68,7 +100,7 @@ if (-not $Aircraft) {
 }
 $Aircraft = $Aircraft.TrimEnd('\')
 if (-not (Test-Aircraft $Aircraft)) {
-    Fail "'$Aircraft' does not look like a ToLiss A320 folder (no .acf with kitchens.obj found)."
+    Fail "'$Aircraft' does not look like a ToLiss A320/A321 folder (no .acf with kitchens.obj found)."
 }
 if (-not $Force -and (Get-Process -Name "X-Plane*" -ErrorAction SilentlyContinue)) {
     Fail "X-Plane is running. Please close X-Plane first, then run this again."
@@ -76,9 +108,13 @@ if (-not $Force -and (Get-Process -Name "X-Plane*" -ErrorAction SilentlyContinue
 
 # the .acf used to read attachment positions: prefer the standard-definition one
 $acfs = @(Get-ChildItem -LiteralPath $Aircraft -Filter *.acf)
-$refAcf = $acfs | Where-Object { $_.Name -eq "a320_StdDef.acf" } | Select-Object -First 1
+# (an XP12 one, a3xx.acf / a3xx_StdDef.acf, not the _XP11 variants, with kitchens.obj attached)
+$refAcf = $acfs | Where-Object { $_.Name -notlike "*XP11*" -and (Read-L1 $_.FullName) -match "(?m)^P _obja/\d+/_v10_att_file_stl kitchens\.obj\r?$" } |
+    Sort-Object { $_.Name -notlike "*_StdDef.acf" }, Name | Select-Object -First 1
 if (-not $refAcf) { $refAcf = $acfs | Where-Object { (Read-L1 $_.FullName) -match "kitchens\.obj" } | Select-Object -First 1 }
 $refText = Read-L1 $refAcf.FullName
+$icao = [regex]::Match($refText, "(?m)^P acf/_ICAO (\S+)").Groups[1].Value
+if (-not $icao) { $icao = "ToLiss" }
 
 function Get-Attach([string]$text, [string]$file) {
     $m = [regex]::Match($text, "(?m)^P _obja/(\d+)/_v10_att_file_stl " + [regex]::Escape($file) + "\r?$")
@@ -251,7 +287,7 @@ if ($Uninstall) {
 }
 
 # ---------------------------------------------------------------- install
-Say "Installing ToLiss FAP into $Aircraft" "Cyan"
+Say "Installing ToLiss FAP into $Aircraft ($icao)" "Cyan"
 Get-ChildItem -LiteralPath $here -Recurse -File | Unblock-File -ErrorAction SilentlyContinue
 
 Say "Plugin"
@@ -289,5 +325,5 @@ Say "  -> $objDir" "Green"
 Update-Acfs $true
 
 Say ""
-Say "Done! Start X-Plane and load the ToLiss A320." "Green"
+Say "Done! Start X-Plane and load the ToLiss $icao." "Green"
 Say "Run this again after every ToLiss update (updates replace the patched files)."
